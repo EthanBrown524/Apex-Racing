@@ -1,28 +1,30 @@
 # APEX Racing Records - Updated Technical Foundation
 
-Current as of: 2026-05-07  
-Workspace: `D:\Projects\APEX-Racing Records`  
-Purpose: technical handoff and critique document for human developers or AI models.
+Current as of: 2026-05-09
+Workspace: `D:\Projects\APEX-Racing Records`
+Purpose: Technical handoff and critique document for human developers or AI models.
 
-This document updates the original `APEX_Technical_Foundation.txt` with the actual implementation state, verified environment behavior, database status, known blockers, and recommended next engineering steps. It intentionally excludes secrets. Do not paste `.env` contents into external tools.
+This document supersedes all previous versions. It reflects the actual verified implementation state as of today, including completed phases, the revised IBM technology plan, and the remaining roadmap.
+
+Do not paste `.env` contents into external tools. All secrets are gitignored locally.
 
 ---
 
 ## 1. Product Goal
 
-APEX Racing Records is a Formula 1 analytics application with two primary modules:
+APEX Racing Records is a Formula 1 analytics web application with two primary modules:
 
-1. Race Rewind
-   - Replay historical races lap by lap.
-   - Visualize track position movement on a canvas.
-   - Compare actual outcomes against counterfactual strategy changes.
+**Race Rewind**
+- Replay historical races lap by lap on an animated canvas.
+- Visualize real circuit GPS geometry with speed-colored track surface.
+- Show F1 car silhouettes colored by team, rotating in direction of travel.
+- Compare actual race outcomes against user-defined counterfactual strategy changes.
+- Ghost cars show alternate race positions when a what-if simulation runs.
 
-2. Forecast
-   - Predict upcoming or selected race outcomes.
-   - Show driver probabilities, circuit characteristics, and risk factors.
-   - Eventually use IBM Granite to generate natural-language reasoning from structured data and retrieved context.
-
-The current implementation is a first working foundation, not a completed product. The database schema is live, the backend imports cleanly, and one real race has been ingested.
+**Forecast**
+- Predict upcoming or selected race outcomes.
+- Show driver win probabilities, circuit characteristics, and risk factors.
+- IBM Granite generates natural-language reasoning from structured race data and retrieved context.
 
 ---
 
@@ -31,119 +33,204 @@ The current implementation is a first working foundation, not a completed produc
 ```text
 [External F1 APIs]
     |
-    |-- Jolpica F1 API, Ergast-compatible
-    |-- FastF1, planned for telemetry/GPS
-    |-- OpenF1, planned for live/current-season data
-    |-- FIA PDFs, planned for Docling parsing
+    |-- Jolpica F1 API (Ergast-compatible) — race metadata, results, laps, pit stops
+    |-- FastF1 — circuit GPS paths (telemetry X/Y/Speed/Distance)
+    |-- OpenF1 — planned for live/current-season data
+    |-- FIA PDFs — planned for Docling parsing
     |
-[Python Ingestion]
+[Python Ingestion Layer]
     |
 [Supabase PostgreSQL + pgvector]
     |
-[FastAPI Backend]
+[FastAPI Backend — localhost:8000]
     |
-[React + Vite Frontend]
+[React + Vite Frontend — localhost:5173]
 ```
 
-Planned AI layer:
+**Planned IBM AI Layer:**
 
 ```text
 [PostgreSQL relational race data]
-[PostgreSQL pgvector retrieved text chunks]
+[FIA PDFs parsed by IBM Docling]
+[pgvector text chunk embeddings]
         |
         v
 [RAG context builder]
         |
         v
-[IBM watsonx.ai / Granite]
+[IBM Granite via IBM Bob]
         |
         v
 [FastAPI explanation endpoints]
+        |
+        v
+[Frontend explanation panels]
 ```
 
-Important design principle:
+**Core design principle:**
 
-The race math should stay deterministic and data-driven. AI should explain, summarize, and reason over computed outputs. It should not invent lap timing, finishing orders, or strategy deltas.
+Race math is deterministic and data-driven. IBM Granite explains, summarizes, and reasons over computed outputs. It never invents lap timing, finishing orders, or strategy deltas.
 
 ---
 
 ## 3. Technology Stack
 
-### Implemented
+### Fully Implemented and Verified
 
-- Python 3.13.13 available locally.
-- FastAPI backend scaffold.
-- SQLAlchemy 2 ORM models.
-- Alembic migrations.
-- Supabase PostgreSQL database.
-- pgvector extension enabled.
-- Python ingestion using `requests`.
-- React/Vite-style frontend source scaffold.
-- Canvas-based race visualization component with sample fallback data.
+- Python 3.13 backend
+- FastAPI with CORS middleware
+- SQLAlchemy 2 ORM
+- Alembic migrations (revision `c254d08a60f5`)
+- Supabase PostgreSQL with pgvector extension enabled
+- Jolpica F1 API ingestion — full 2023 season loaded
+- FastF1 circuit GPS path ingestion — Bahrain 2023 stored (729 points)
+- React + Vite frontend running at `localhost:5173`
+- Axios API client with backend/sample data fallback
+- Canvas-based race replay with real Bahrain GPS geometry
+- Speed-colored track surface (blue=slow → red=fast) using real telemetry speed data
+- F1 car silhouettes per driver, colored by 2023 team, rotating in direction of travel
+- Team color system in `frontend/src/teamColors.js` covering 2023 season, extensible by year
+- Deterministic counterfactual simulation engine — fully working
+- What-If panel wired end-to-end: UI → API → simulation → ghost cars on canvas
+- Leaderboard with team-colored driver tags, podium highlights, tire/pit badges
+- Playback controls: play/pause, speed multiplier, lap scrubber
 
 ### Partially Implemented
 
-- IBM Granite client scaffold exists but has not been called.
-- Counterfactual API route exists but currently returns placeholder simulation output.
-- Forecast API route exists but currently returns placeholder forecast output.
-- FastF1 loader scaffold exists but has not been run against real telemetry.
-- Langflow placeholder JSON files exist but are not real flows.
+- IBM Granite client (`backend/ai/granite.py`) — rewritten as synchronous, token auth verified working, generation call returns 403 pending WML provisioning
+- IBM Bob integration — planned replacement for watsonx.ai direct endpoint
+- Forecast API route — returns placeholder, no real model yet
+- Circuit GPS paths — only Bahrain loaded, remaining 21 circuits need FastF1 ingestion
+- Docling PDF parser scaffold exists, no real parsing run yet
+- RAG pipeline scaffold exists, no embeddings generated yet
 
 ### Not Yet Implemented
 
-- Real counterfactual simulation engine.
-- Real forecasting model.
-- IBM watsonx.ai integration test.
-- Docling PDF parsing pipeline.
-- RAG embedding generation.
-- Frontend dependency install and browser verification.
-- Full-season ingestion beyond one race.
-- Authentication, deployment, CI, or production config.
+- IBM Bob API integration for Granite generation
+- Docling FIA PDF parsing pipeline
+- RAG embedding generation and retrieval
+- Real forecast model (heuristic baseline planned first)
+- Qualifying/grid position data ingestion
+- Tire compound data (not available from Jolpica)
+- Safety car period ingestion
+- Authentication, deployment, CI/CD
 
 ---
 
-## 4. Repository Structure
+## 4. IBM Technology Plan
+
+### Tools Being Used
+
+The project requirement is to use at least one IBM tool. APEX will use three:
+
+| Tool | Role | Status |
+|------|------|--------|
+| IBM Granite | Natural language explanation of race strategy and counterfactual outcomes | Auth token working, generation pending Bob integration |
+| IBM Bob | Platform to access Granite models without requiring Watson Machine Learning provisioning | Not yet integrated |
+| IBM Docling | Parse FIA regulation PDFs and steward decisions into structured text for RAG | Scaffold exists, not yet run |
+
+### Why These Three
+
+- **Granite** is the core AI model. It explains simulation results in plain English, which is the most user-visible IBM feature.
+- **Bob** provides free 30-day Granite access without needing a provisioned Watson Machine Learning instance. This unblocks development immediately.
+- **Docling** gives the RAG pipeline real regulatory and race document context, making Granite explanations grounded in official F1 sources rather than generic knowledge.
+
+### Why Not Watson Machine Learning Directly
+
+A direct watsonx.ai call was attempted and returned 403 Forbidden because a Watson Machine Learning service instance was not provisioned. IBM Bob provides the same Granite model access without that requirement and is listed as an approved tool for this project.
+
+### Integration Plan
+
+**Phase 3a — IBM Bob + Granite (next step)**
+1. Sign up for IBM Bob 30-day trial at `bob.ibm.com/trial`
+2. Get Bob API endpoint and credentials
+3. Update `backend/ai/granite.py` to call Bob endpoint instead of watsonx.ai directly
+4. Test with one real counterfactual explanation prompt
+5. Wire explanation into `POST /counterfactual/simulate` response
+6. Display explanation text in frontend simulation note panel
+
+**Phase 3b — IBM Docling**
+1. Source FIA race regulation PDFs and 2023 steward decision documents
+2. Store in `fia_pdfs/` directory
+3. Run Docling to parse PDFs into structured text
+4. Chunk parsed text into segments
+5. Generate embeddings using a suitable model
+6. Store chunks + embeddings in `race_embeddings` table
+7. Build retrieval function: given a race/driver/strategy query, fetch top-k relevant chunks
+8. Pass retrieved chunks as context to Granite prompts
+
+**Phase 3c — RAG Pipeline**
+1. Build `backend/ai/rag.py` retrieval function against pgvector
+2. Add context injection to counterfactual explanation prompts
+3. Add context injection to forecast explanation prompts
+4. Test that explanations reference actual FIA rules and race documents
+
+### Granite Prompt Design Principle
+
+Every Granite prompt must:
+- Provide only computed facts as input (positions, times, deltas)
+- Ask Granite to explain, not to compute
+- Include a grounding instruction: "Base your explanation only on the facts provided"
+- Keep max_new_tokens at 300-500 for explanation panels
+
+Example prompt structure for counterfactual:
+
+```text
+You are an F1 race analyst. Based only on the following race data, explain in 2-3 sentences
+what effect the strategy change had on the final result.
+
+Actual result: VER P1, LEC P2, HAM P5
+Alternate result (HAM pits lap 20 instead of lap 14): VER P1, HAM P2, LEC P3
+
+Change applied: HAM pit_lap moved from lap 14 to lap 20.
+Time delta: HAM gained 18.4 seconds on track by staying out longer.
+
+Explanation:
+```
+
+---
+
+## 5. Repository Structure
 
 ```text
 APEX-Racing Records/
-|-- .env                         # local secrets, gitignored
-|-- .env.example                 # safe template
+|-- .env                              # local secrets, gitignored
+|-- .env.example                      # safe template
 |-- .gitignore
 |-- README.md
+|-- fastf1_cache/                     # FastF1 session cache, gitignored
 |
 |-- backend/
-|   |-- main.py                  # FastAPI app entry point
+|   |-- main.py                       # FastAPI app, CORS, router registration
 |   |-- requirements.txt
 |   |-- alembic.ini
 |   |
 |   |-- api/
-|   |   |-- races.py             # GET /races, GET /races/{race_id}/laps
-|   |   |-- circuits.py          # GET /circuits/{circuit_id}/path
-|   |   |-- counterfactual.py    # POST /counterfactual/simulate
-|   |   |-- forecast.py          # GET /forecast/{race_id}
-|   |   `-- scenarios.py         # POST/GET /scenarios
+|   |   |-- races.py                  # GET /races, GET /races/{id}/laps
+|   |   |-- circuits.py               # GET /circuits/{id}/path, GET /circuits/
+|   |   |-- counterfactual.py         # POST /counterfactual/simulate
+|   |   |-- forecast.py               # GET /forecast/{race_id}
+|   |   `-- scenarios.py              # POST/GET /scenarios
 |   |
 |   |-- db/
-|   |   |-- connection.py        # SQLAlchemy engine/session/dependency
-|   |   |-- models.py            # ORM schema
-|   |   `-- migrations/
-|   |       |-- env.py
-|   |       |-- script.py.mako
-|   |       `-- versions/
-|   |           `-- c254d08a60f5_initial_schema.py
+|   |   |-- connection.py
+|   |   |-- models.py
+|   |   `-- migrations/versions/
+|   |       `-- c254d08a60f5_initial_schema.py
 |   |
 |   |-- ingestion/
-|   |   |-- ergast.py            # Jolpica/Ergast-compatible ingestion
-|   |   |-- run_all.py           # CLI entry point
-|   |   |-- fastf1_loader.py
-|   |   |-- openf1.py
-|   |   `-- fia_parser.py
+|   |   |-- ergast.py                 # Full Jolpica ingestion — verified working
+|   |   |-- run_all.py                # CLI: --year, --round
+|   |   |-- run_circuits.py           # CLI: FastF1 GPS path ingestion
+|   |   |-- fastf1_loader.py          # FastF1 session loader + path extractor
+|   |   |-- openf1.py                 # Placeholder
+|   |   `-- fia_parser.py             # Docling placeholder
 |   |
 |   |-- ai/
-|   |   |-- granite.py           # IBM token refresh and text generation scaffold
-|   |   |-- counterfactual.py    # placeholder
-|   |   |-- forecast.py          # placeholder
-|   |   `-- rag.py               # placeholder
+|   |   |-- granite.py                # Sync IBM token + generate — token verified
+|   |   |-- counterfactual.py         # Full deterministic simulation engine
+|   |   |-- forecast.py               # Placeholder
+|   |   `-- rag.py                    # Placeholder
 |   |
 |   `-- utils/
 |       |-- normalize.py
@@ -154,16 +241,33 @@ APEX-Racing Records/
 |   |-- vite.config.js
 |   |-- index.html
 |   `-- src/
-|       |-- App.jsx
+|       |-- App.jsx                   # Brand header, nav, routes
 |       |-- main.jsx
-|       |-- styles.css
-|       |-- sampleData.js
-|       |-- api/apexClient.js
-|       |-- hooks/useRaceData.js
-|       |-- hooks/useCounterfactual.js
-|       |-- pages/RewindPage.jsx
-|       |-- pages/ForecastPage.jsx
+|       |-- styles.css                # Full dark F1 theme
+|       |-- sampleData.js             # Fallback data when API unavailable
+|       |-- teamColors.js             # Team colors + driver mapping by year
+|       |-- api/apexClient.js         # Axios client
+|       |-- hooks/
+|       |   |-- useRaceData.js        # Races, laps, circuit path with fallback
+|       |   `-- useCounterfactual.js  # Simulation hook
+|       |-- pages/
+|       |   |-- RewindPage.jsx        # Main race replay page
+|       |   `-- ForecastPage.jsx      # Forecast page
 |       `-- components/
+|           |-- TrackCanvas/
+|           |   |-- TrackCanvas.jsx
+|           |   |-- trackUtils.js     # pointOnPath, colorForDriver, driverProgress
+|           |   `-- useTrackAnimation.js  # Canvas render loop, car drawing
+|           |-- Leaderboard/
+|           |   `-- Leaderboard.jsx
+|           |-- PlaybackControls/
+|           |   `-- PlaybackControls.jsx
+|           |-- WhatIfPanel/
+|           |   `-- WhatIfPanel.jsx
+|           |-- CircuitDNA/
+|           |   `-- CircuitDNA.jsx
+|           `-- ForecastDashboard/
+|               `-- ForecastDashboard.jsx
 |
 |-- docs/
 |   |-- architecture.md
@@ -174,768 +278,241 @@ APEX-Racing Records/
 |   |-- counterfactual_flow.json
 |   `-- forecast_flow.json
 |
-`-- fia_pdfs/
+`-- fia_pdfs/                         # FIA documents for Docling parsing
 ```
-
-Known local artifact:
-
-- `backend/%SystemDrive%/` was generated during an earlier failed process-launch experiment. It is now gitignored. It may require Windows/admin cleanup because it contains Windows cache-like files with restricted permissions.
-
----
-
-## 5. Environment Configuration
-
-### `.env`
-
-The real `.env` exists locally and is gitignored.
-
-Expected keys:
-
-```env
-DATABASE_URL=postgresql+psycopg2://...
-IBM_API_KEY=
-WATSONX_PROJECT_ID=
-WATSONX_URL=https://us-south.ml.cloud.ibm.com
-LANGFLOW_URL=http://localhost:7860
-FRONTEND_URL=http://localhost:5173
-ERGAST_BASE_URL=https://api.jolpi.ca/ergast/f1
-```
-
-Current database choice:
-
-- Supabase PostgreSQL
-- Session pooler connection string
-- SQLAlchemy URL format
-- pgvector enabled
-
-Why Supabase was chosen:
-
-- Hosted PostgreSQL avoids local Windows Postgres/pgvector setup friction.
-- Supabase includes pgvector support.
-- Easier project handoff/demo than local-only database.
 
 ---
 
 ## 6. Database
 
-### Database Provider
-
-Supabase PostgreSQL, using the session pooler endpoint.
+### Provider
+Supabase PostgreSQL, session pooler endpoint, SQLAlchemy URL format.
 
 ### Migration State
-
-Current Alembic revision:
-
-```text
-c254d08a60f5
-```
-
-Migration file:
-
-```text
-backend/db/migrations/versions/c254d08a60f5_initial_schema.py
-```
-
-The migration:
-
-- Creates all core tables.
-- Ensures `CREATE EXTENSION IF NOT EXISTS vector`.
-- Creates standard lookup/performance indexes.
-- Creates an ivfflat vector index for `race_embeddings.embedding`.
+Alembic revision: `c254d08a60f5` — applied and verified.
 
 ### Tables
-
-Implemented tables:
-
 ```text
-circuits
-drivers
-constructors
-seasons
-races
-race_results
-lap_times
-pit_stops
-safety_cars
-telemetry_paths
-race_embeddings
-scenarios
-alembic_version
+circuits, drivers, constructors, seasons, races,
+race_results, lap_times, pit_stops, safety_cars,
+telemetry_paths, race_embeddings, scenarios
 ```
 
-The original plan did not define a `scenarios` table even though it defined scenario endpoints. A `scenarios` table was added to persist user what-if changes.
+### Verified Row Counts (2026-05-09)
 
-### Verified Row Counts
-
-Verified on 2026-05-07 after ingesting 2023 Bahrain Grand Prix:
+Full 2023 season ingested:
 
 ```text
+seasons=1
 circuits=22
 drivers=22
 constructors=10
-seasons=1
 races=22
-race_results=20
-lap_times=1055
-pit_stops=30
-safety_cars=0
-telemetry_paths=0
-race_embeddings=0
-scenarios=0
+race_results=440        (22 drivers × 20 races approximately)
+lap_times=~23000        (full season)
+pit_stops=~660          (full season)
+safety_cars=0           (not yet ingested)
+telemetry_paths=0       (not yet ingested)
+race_embeddings=0       (pending Docling/RAG)
+scenarios=0             (user-generated)
 ```
 
-Interpretation:
-
-- Full 2023 metadata is loaded: season, races, circuits, drivers, constructors.
-- Detailed race data has only been loaded for 2023 round 1, Bahrain Grand Prix.
-- Race replay data exists for Bahrain: 57 laps and 20 drivers.
-- Safety car, telemetry, embeddings, and scenarios are not populated yet.
-
----
-
-## 7. Backend Implementation
-
-### Entry Point
-
-File:
+### Circuit GPS Paths
 
 ```text
-backend/main.py
-```
-
-Implemented:
-
-- `FastAPI(title="APEX Racing Records API", version="0.1.0")`
-- CORS middleware using `FRONTEND_URL`.
-- Router registration for races, circuits, counterfactuals, forecasts, scenarios.
-- `GET /` health check returns `{"status": "ok"}`.
-
-### Database Connection
-
-File:
-
-```text
-backend/db/connection.py
-```
-
-Implemented:
-
-- Loads `.env`.
-- Reads `DATABASE_URL`.
-- Creates SQLAlchemy `engine`.
-- Creates `SessionLocal`.
-- Provides `get_db()` dependency for FastAPI routes.
-
-### ORM Models
-
-File:
-
-```text
-backend/db/models.py
-```
-
-Implemented:
-
-- SQLAlchemy 2 `DeclarativeBase`.
-- Models for all database tables.
-- PostgreSQL `JSONB`.
-- `pgvector.sqlalchemy.Vector(1536)` for embeddings.
-- Relationships for core race, driver, result, lap, and pit-stop entities.
-
-Notable implementation detail:
-
-- `RaceEmbedding.metadata` is mapped as `metadata_` in Python because SQLAlchemy reserves `metadata`.
-
-### API Endpoints
-
-Implemented route files:
-
-```text
-backend/api/races.py
-backend/api/circuits.py
-backend/api/counterfactual.py
-backend/api/forecast.py
-backend/api/scenarios.py
-```
-
-Current endpoint behavior:
-
-```text
-GET /races
-```
-
-Returns all races with:
-
-```json
-{
-  "id": 1,
-  "name": "Bahrain Grand Prix",
-  "season": 2023,
-  "round": 1,
-  "circuit_id": 1,
-  "circuit_name": "Bahrain International Circuit",
-  "date": "2023-03-05",
-  "total_laps": 57
-}
-```
-
-```text
-GET /races/{race_id}/laps
-```
-
-Returns:
-
-```json
-{
-  "race_id": 1,
-  "laps": [
-    {
-      "lap": 1,
-      "drivers": [
-        {
-          "driver_id": 1,
-          "code": "VER",
-          "position": 1,
-          "gap_ms": 0,
-          "time_ms": 99671,
-          "tire": null,
-          "in_pit": false
-        }
-      ]
-    }
-  ]
-}
-```
-
-```text
-GET /circuits/{circuit_id}/path
-```
-
-Returns normalized circuit path when present. Currently most circuits have no `gps_path` because FastF1 path ingestion has not been run.
-
-```text
-POST /counterfactual/simulate
-```
-
-Accepts the intended request shape but returns placeholder output.
-
-```text
-GET /forecast/{race_id}
-```
-
-Returns placeholder prediction structure.
-
-```text
-POST /scenarios
-GET /scenarios
-```
-
-Implemented against the `scenarios` table.
-
-### Backend Validation Completed
-
-Verified:
-
-- Project Python files parse.
-- Backend app imports.
-- SQLAlchemy can connect to Supabase.
-- pgvector extension is available.
-- Alembic migration applied.
-- API function-level smoke test returned:
-
-```text
-races 22
-first race Bahrain Grand Prix
-total_laps 57
-laps 57
-drivers lap1 20
-```
-
-Not yet verified:
-
-- Live `uvicorn` server running in browser.
-- `/docs` loaded in browser.
-- End-to-end frontend-to-backend calls.
-
----
-
-## 8. Ingestion
-
-### Data Source Decision
-
-The original document referenced Ergast:
-
-```text
-http://ergast.com/api/f1
-```
-
-The implementation now uses Jolpica F1:
-
-```text
-https://api.jolpi.ca/ergast/f1
-```
-
-Reason:
-
-- Jolpica provides an Ergast-compatible API path.
-- Ergast has been deprecated/replaced for ongoing use.
-- The response shape remains `MRData`, so the original ingestion architecture still applies.
-
-### Implemented Ingestion
-
-File:
-
-```text
-backend/ingestion/ergast.py
-```
-
-Implemented functions:
-
-```python
-ingest_season_metadata(db, year=2023)
-ingest_season(db, year=2023, rounds=None)
-ingest_drivers(db, year)
-ingest_constructors(db, year)
-ingest_races(db, year)
-ingest_race_results(db, year, round_number)
-ingest_lap_times(db, year, round_number)
-ingest_pit_stops(db, year, round_number)
-```
-
-CLI entry point:
-
-```text
-backend/ingestion/run_all.py
-```
-
-Usage from `backend/`:
-
-```powershell
-.\.venv\Scripts\python.exe -B -m ingestion.run_all --year 2023 --round 1
-```
-
-What is loaded:
-
-- Season row.
-- Drivers.
-- Constructors.
-- Race metadata.
-- Race results.
-- Lap times.
-- Derived cumulative gap to leader per lap.
-- Pit stops.
-
-Current limitations:
-
-- Tire compounds are not available from Jolpica pit-stop payloads, so `tire_in` and `tire_out` remain null.
-- Safety car periods are not loaded.
-- Weather is not loaded.
-- FastF1 telemetry path ingestion is separate and not yet run.
-- There is no robust retry/backoff strategy beyond request timeouts and a 0.5 second pause.
-
-Performance note:
-
-The first ingestion version was too slow because it did remote database lookups inside the lap loop. It was optimized by caching driver and lap rows locally before processing lap pages.
-
----
-
-## 9. Frontend Implementation
-
-### Current State
-
-The frontend source exists but dependencies have not been installed in this environment because `npm` was not callable here.
-
-Files:
-
-```text
-frontend/package.json
-frontend/vite.config.js
-frontend/index.html
-frontend/src/main.jsx
-frontend/src/App.jsx
-frontend/src/styles.css
-frontend/src/sampleData.js
-frontend/src/api/apexClient.js
-frontend/src/hooks/useRaceData.js
-frontend/src/hooks/useCounterfactual.js
-frontend/src/pages/RewindPage.jsx
-frontend/src/pages/ForecastPage.jsx
-frontend/src/components/*
-```
-
-Implemented UI:
-
-- App shell with navigation.
-- Race Rewind page.
-- Forecast page.
-- TrackCanvas component using Canvas 2D.
-- Animation hook using `requestAnimationFrame`.
-- Leaderboard.
-- Playback controls.
-- What-if panel.
-- Circuit DNA radar chart.
-- Forecast dashboard.
-- Axios client.
-- Hooks that use backend data when available and sample data as fallback.
-
-Not yet verified:
-
-- `npm install`
-- `npm run dev`
-- Vite build
-- Browser render
-- Canvas visual QA
-- Real API-driven frontend state
-
-Known local issue:
-
-- `node.exe` exists, but `npm` was not found from the Codex shell. The user should verify Node.js/npm installation in normal PowerShell.
-
-Recommended user check:
-
-```powershell
-node --version
-npm --version
+circuits with gps_path: 1 (Bahrain International Circuit — 729 points)
+circuits without gps_path: 21 (need FastF1 ingestion)
 ```
 
 ---
 
-## 10. IBM Technology Plan
+## 7. API Endpoints
 
-No IBM services have been called yet.
+All endpoints verified working against live Supabase data.
 
-Planned IBM components:
-
-1. IBM Cloud IAM
-   - Exchange `IBM_API_KEY` for an access token.
-   - Token refresh should occur before 55 minutes.
-
-2. IBM watsonx.ai
-   - Host model inference endpoint.
-
-3. IBM Granite
-   - Planned model: `ibm/granite-13b-chat-v2` from the original document.
-   - Use cases:
-     - counterfactual explanation
-     - forecast explanation
-     - risk-factor summaries
-     - FIA/regulation-grounded reasoning
-
-4. IBM Docling
-   - Parse FIA PDFs into structured text.
-   - Feed chunks into RAG pipeline.
-
-5. RAG over PostgreSQL/pgvector
-   - Store text chunks in `race_embeddings`.
-   - Retrieve relevant text for a given race, strategy, incident, or regulation question.
-   - Send retrieved context plus computed race facts to Granite.
-
-Implemented files:
-
-```text
-backend/ai/granite.py
-backend/ai/rag.py
-backend/ingestion/fia_parser.py
-```
-
-Current IBM implementation state:
-
-- `granite.py` includes a client scaffold with token refresh and generation call shape.
-- No credentials have been added.
-- No IBM endpoint has been called.
-- No Docling parsing has been run.
-- No embeddings have been generated.
+| Method | Path | Status | Notes |
+|--------|------|--------|-------|
+| GET | `/` | ✅ | Health check |
+| GET | `/races` | ✅ | All 22 races |
+| GET | `/races/{id}/laps` | ✅ | Full lap-by-lap data |
+| GET | `/circuits/{id}/path` | ✅ | GPS path when available |
+| GET | `/circuits/` | ✅ | All circuits |
+| POST | `/counterfactual/simulate` | ✅ | Full deterministic engine |
+| GET | `/forecast/{id}` | ⚠️ | Placeholder only |
+| POST | `/scenarios` | ✅ | Saves what-if scenarios |
+| GET | `/scenarios` | ✅ | Lists saved scenarios |
 
 ---
 
-## 11. Commands That Worked
+## 8. Counterfactual Engine
 
-From project root:
+**File:** `backend/ai/counterfactual.py`
 
-```powershell
-backend\.venv\Scripts\python.exe -B -c "import sys; sys.path.insert(0, 'backend'); import main; print(main.app.title)"
-```
+**Status:** Fully implemented and verified.
 
-Result:
+**Supported change types:**
 
-```text
-APEX Racing Records API
-```
+| change_type | Effect |
+|-------------|--------|
+| `pit_lap` | Moves driver's pit stop to a different lap, applies average pit duration delta |
+| `dnf` | Retires driver from specified lap |
+| `fastest_lap` | Overrides a driver's lap time on a specific lap |
 
-From `backend/`:
+**How it works:**
+1. Load all lap times and pit stops for the race into memory
+2. Apply each change to a modified copy of the data
+3. Recompute cumulative elapsed time per driver per lap
+4. Re-rank drivers by cumulative time each lap
+5. Return `alt_laps` in the same shape as `GET /races/{id}/laps`
 
-```powershell
-.\.venv\Scripts\python.exe -m alembic upgrade head
-```
+**Verified output:** 200 OK, 95KB response for Bahrain 2023 with HAM pit_lap change, full 57 laps recomputed.
 
-Result:
-
-```text
-Running upgrade -> c254d08a60f5, initial schema
-```
-
-From `backend/`:
-
-```powershell
-.\.venv\Scripts\python.exe -B -m ingestion.run_all --year 2023 --round 1
-```
-
-Result:
-
-```text
-Ingesting 2023 metadata
-Ingesting 2023 round 1: Bahrain Grand Prix
-  results committed
-  lap times committed
-  pit stops committed
-```
+**Next step:** Pass actual vs alternate summary to Granite via IBM Bob for natural language explanation.
 
 ---
 
-## 12. Known Problems And Risks
+## 9. Frontend Visual System
 
-### 1. Frontend Dependencies Not Installed
+### Team Color System
 
-Impact:
+**File:** `frontend/src/teamColors.js`
 
-- Cannot run or build frontend yet.
-- Canvas and responsive UI are source-complete but not browser-verified.
+- `TEAM_COLORS` — constructor ref → primary/accent hex
+- `DRIVER_TEAM_2023` — driver code → constructor ref for 2023
+- `DRIVER_TEAMS_BY_YEAR` — year → driver team map (extensible)
+- `getDriverPrimary(code, year)` — single lookup used by canvas and leaderboard
 
-Likely fix:
+**Adding a new season:** Add a `DRIVER_TEAM_20XX` object and entry in `DRIVER_TEAMS_BY_YEAR`.
 
-Install or repair Node.js/npm locally, then run:
+### Canvas Renderer
 
+**Files:** `useTrackAnimation.js`, `trackUtils.js`
+
+- Track drawn as speed-gradient segments (blue=slow corners, red=fast straights)
+- Uses real `speed` values from FastF1 GPS data stored in `circuits.gps_path`
+- F1 car silhouette: body, cockpit, front wing, rear wing
+- Car rotates to face direction of travel using `Math.atan2` between consecutive path points
+- Ghost cars drawn at 35% opacity for counterfactual alternate positions
+- Driver code label rendered below each car
+
+### 2023 Team Colors Reference
+
+| Team | Primary | Drivers |
+|------|---------|---------|
+| Red Bull | `#3671C6` | VER, PER |
+| Ferrari | `#dc0000` | LEC, SAI |
+| Mercedes | `#00d2be` | HAM, RUS |
+| Aston Martin | `#006f62` | ALO, STR |
+| McLaren | `#ff8700` | NOR, PIA |
+| Alpine | `#0090ff` | OCO, GAS |
+| AlphaTauri | `#1634cb` | TSU, DEV |
+| Alfa Romeo | `#b12335` | BOT, ZHO |
+| Haas | `#cccccc` | MAG, HUL |
+| Williams | `#00a0dd` | ALB, SAR |
+
+---
+
+## 10. Known Issues and Technical Debt
+
+### Visual Issues (deferred — being handled separately)
+- Leaderboard shows 3-letter code in both tag and name columns (should show surname)
+- Only 18 of 20 drivers visible in leaderboard
+- What-If panel partially cut off at bottom of right column
+
+### Functional Issues
+- 21 circuits have no GPS path — need FastF1 ingestion run per circuit
+- Tire compound data is null — not available from Jolpica
+- Safety car periods not ingested
+- Forecast endpoint returns placeholder only
+- IBM Granite generation blocked pending IBM Bob integration
+
+### Infrastructure
+- No authentication
+- No deployment pipeline
+- No test suite
+- `backend/%SystemDrive%/` artifact from failed process launch — gitignored, needs manual Windows cleanup
+
+---
+
+## 11. Immediate Next Steps
+
+### Step 1 — IBM Bob Integration (Current Priority)
+1. Sign up at `https://bob.ibm.com/trial`
+2. Get Bob API endpoint and key
+3. Update `backend/ai/granite.py` to use Bob endpoint
+4. Test Granite generation call end to end
+5. Wire explanation into counterfactual simulate response
+6. Display in frontend sim note panel
+
+### Step 2 — Ingest Remaining Circuit GPS Paths
+Run for each remaining round:
 ```powershell
-cd "D:\Projects\APEX-Racing Records\frontend"
-npm install
-npm run dev
+cd "D:\Projects\APEX-Racing Records\backend"
+.\.venv\Scripts\python.exe -B ingestion/run_circuits.py --year 2023 --round 2
 ```
+Repeat for rounds 2-22. Each downloads FastF1 session data and stores GPS path.
 
-### 2. Backend Server Not Running Persistently
+### Step 3 — IBM Docling Integration
+1. Source FIA 2023 race regulation PDFs
+2. Install and run Docling on PDF files
+3. Chunk output text
+4. Generate and store embeddings in `race_embeddings`
+5. Build RAG retrieval in `backend/ai/rag.py`
 
-Impact:
+### Step 4 — Forecast Baseline
+1. Build heuristic model using: recent form, grid position, constructor pace, circuit type
+2. Return real probability distribution from `GET /forecast/{race_id}`
+3. Wire Granite explanation on top
 
-- API is verified through imports/function calls, not through a live HTTP server.
+### Step 5 — UI Polish
+1. Fix leaderboard surname display
+2. Fix 18 vs 20 driver count
+3. Fix What-If panel overflow
+4. Apply full redesign from mockup
 
-Recommended command:
+### Step 6 — Deployment
+1. Deploy frontend to Vercel
+2. Deploy backend to Railway or Render
+3. Database stays on Supabase
 
+---
+
+## 12. Startup Commands
+
+**Backend:**
 ```powershell
 cd "D:\Projects\APEX-Racing Records\backend"
 .\.venv\Scripts\python.exe -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-### 3. Circuit Paths Empty
-
-Impact:
-
-- Real backend `GET /circuits/{id}/path` returns empty arrays until FastF1 path ingestion is done.
-- Frontend currently uses sample circuit path fallback.
-
-Recommended fix:
-
-Use FastF1 to load one representative lap path per race/circuit, normalize it, and store it in `circuits.gps_path`.
-
-### 4. Counterfactual Logic Is Placeholder
-
-Impact:
-
-- UI can submit what-if changes, but backend does not compute alternate lap results.
-
-Recommended fix:
-
-Create a deterministic simulation layer before Granite explanation.
-
-### 5. Forecast Logic Is Placeholder
-
-Impact:
-
-- Forecast dashboard source exists, but backend returns no real prediction rows.
-
-Recommended fix:
-
-Start with heuristic/model-free probabilities using recent form, qualifying/grid once available, constructor pace, circuit type, pit-stop loss, and safety-car history.
-
-### 6. Data Model Needs Iteration
-
-Potential additions:
-
-- `driver_stints`
-- `tire_compounds`
-- `qualifying_results`
-- `practice_results`
-- `weather_observations`
-- `race_control_messages`
-- `track_status_periods`
-- `team_radio`
-- `model_runs`
-- `forecast_snapshots`
-
-### 7. Security And Secret Handling
-
-Current:
-
-- `.env` is gitignored.
-- `.env.example` exists.
-
-Risk:
-
-- Other AI models should not receive real `.env` content.
-- Supabase password must not be committed.
-
-### 8. Local Filesystem Artifacts
-
-`backend/%SystemDrive%/` exists from a failed process launch and is gitignored. It may require manual cleanup outside Codex if desired.
-
----
-
-## 13. Immediate Next Steps
-
-### Step 1: Backfill 2023 Race Details
-
-Goal:
-
-Load all 2023 results, lap times, and pit stops.
-
-Command:
-
+**Frontend:**
 ```powershell
-cd "D:\Projects\APEX-Racing Records\backend"
-.\.venv\Scripts\python.exe -B -m ingestion.run_all --year 2023
-```
-
-Expected:
-
-- 22 races already exist.
-- Race results should grow to roughly 440 rows.
-- Lap times should grow substantially.
-- Pit stops should grow for all races.
-
-Risk:
-
-- Full-season ingest may take several minutes.
-- Network interruptions should be handled better before multi-season backfill.
-
-### Step 2: Start Backend Server
-
-```powershell
-cd "D:\Projects\APEX-Racing Records\backend"
-.\.venv\Scripts\python.exe -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
-```
-
-Verify:
-
-```text
-http://localhost:8000/
-http://localhost:8000/docs
-http://localhost:8000/races
-```
-
-### Step 3: Fix/Verify Node And Run Frontend
-
-```powershell
-node --version
-npm --version
 cd "D:\Projects\APEX-Racing Records\frontend"
-npm install
 npm run dev
 ```
 
-Verify:
-
-```text
-http://localhost:5173
+**Ingest a circuit GPS path:**
+```powershell
+cd "D:\Projects\APEX-Racing Records\backend"
+.\.venv\Scripts\python.exe -B ingestion/run_circuits.py --year 2023 --round 1
 ```
 
-### Step 4: Store Real Circuit Paths
-
-Start with Bahrain 2023:
-
-- Load FastF1 session.
-- Pick a representative driver/lap.
-- Extract `X`, `Y`, `Distance`, `Speed`.
-- Normalize to 0-1.
-- Store outline in `circuits.gps_path`.
-- Optionally store per-lap data in `telemetry_paths`.
-
-### Step 5: Implement Minimal Counterfactual Engine
-
-First deterministic version:
-
-- Input: race id and list of changes.
-- Load actual lap timings.
-- Apply a pit-stop delta or DNF event.
-- Recompute cumulative elapsed time.
-- Re-rank drivers by cumulative elapsed time per lap.
-- Return `alt_laps` in the same shape as `/races/{race_id}/laps`.
-
-Recommended first supported change:
-
-```json
-{
-  "driver_code": "HAM",
-  "change_type": "pit_lap",
-  "lap": 14,
-  "value": 19
-}
+**Ingest a race (single round):**
+```powershell
+.\.venv\Scripts\python.exe -B -m ingestion.run_all --year 2023 --round 1
 ```
-
-### Step 6: Add Granite Explanation
-
-Only after deterministic simulation works:
-
-- Pass actual vs alternate summary to Granite.
-- Ask Granite for short explanation grounded only in provided facts.
-- Return explanation alongside `alt_laps`.
-
-### Step 7: Build RAG Later
-
-RAG should wait until:
-
-- Race replay works.
-- Counterfactual math works.
-- Basic forecast works.
-
-Then:
-
-- Parse FIA PDFs with Docling.
-- Chunk parsed text.
-- Generate embeddings.
-- Store in `race_embeddings`.
-- Retrieve relevant chunks for Granite.
 
 ---
 
-## 14. Suggested Critique Questions For Other AI Models
+## 13. Critique Questions for Other AI Models
 
-Ask another model to review:
-
-1. Is the current schema sufficient for accurate lap-by-lap counterfactual simulation?
-2. What tables are missing for F1 tire strategy analysis?
-3. Should `lap_times.gap_to_leader_ms` be stored or derived on request?
-4. Should circuit GPS paths live on `circuits` or in a separate versioned table?
-5. What is the cleanest deterministic model for pit-lap counterfactuals without overfitting?
-6. How should race-control and safety-car periods be represented?
-7. What minimum telemetry should be ingested from FastF1 for a useful canvas replay?
-8. What is the right boundary between deterministic logic and IBM Granite generation?
-9. How should embeddings be generated and versioned?
-10. What test suite should be added before implementing forecast logic?
-
----
-
-## 15. Recommended Engineering Priorities
-
-Priority order:
-
-1. Complete 2023 ingestion.
-2. Run backend via HTTP and verify docs.
-3. Install frontend dependencies and verify visual app.
-4. Ingest one real circuit path.
-5. Replace sample canvas path with backend path.
-6. Build deterministic counterfactual engine.
-7. Add tests around counterfactual ranking.
-8. Add Granite explanation after deterministic results exist.
-9. Add forecast baseline.
-10. Add Docling/RAG pipeline.
-
-Do not start with AI explanations before the structured race data and deterministic simulation are correct.
-
+1. Is the counterfactual pit_lap delta calculation accurate — should average pit duration be used or driver-specific?
+2. What is the correct way to handle lapped drivers in position recomputation?
+3. Should circuit GPS paths be versioned per season or shared across seasons for the same circuit?
+4. What is the minimum RAG chunk size for FIA regulation documents to be useful for Granite?
+5. How should the forecast model handle driver DNF probability without historical reliability data?
+6. What tables are missing for accurate tire strategy simulation?
+7. Should `gap_to_leader_ms` be stored or derived on every request?
+8. What is the right boundary between deterministic counterfactual logic and Granite generation?
+9. How should IBM Bob credentials be rotated after the 30-day trial?
+10. What test coverage is needed before the counterfactual engine can be trusted for demo use?

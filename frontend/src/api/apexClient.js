@@ -40,3 +40,7 @@ export async function fetchScenarios() {
   return response.data;
 }
 
+export async function fetchLapTelemetry(raceId, lap) {
+  const response = await apexClient.get(`/races/${raceId}/telemetry/${lap}`);
+  return response.data;
+}

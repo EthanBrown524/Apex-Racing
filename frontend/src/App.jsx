@@ -7,12 +7,12 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div>
-          <p className="eyebrow">APEX</p>
-          <h1>Racing Records</h1>
+        <div className="brand">
+          <span className="brand-badge">APEX</span>
+          <span className="brand-name">Racing Records</span>
         </div>
         <nav className="topnav" aria-label="Primary">
-          <NavLink to="/">Race Rewind</NavLink>
+          <NavLink to="/" end>Race Rewind</NavLink>
           <NavLink to="/forecast">Forecast</NavLink>
         </nav>
       </header>
@@ -24,4 +24,3 @@ export default function App() {
     </div>
   );
 }
-

@@ -6,6 +6,7 @@ import TrackCanvas from "../components/TrackCanvas/TrackCanvas.jsx";
 import WhatIfPanel from "../components/WhatIfPanel/WhatIfPanel.jsx";
 import { useCounterfactual } from "../hooks/useCounterfactual.js";
 import { useRaceData } from "../hooks/useRaceData.js";
+import { useTelemetry } from "../hooks/useTelemetry.js";
 
 export default function RewindPage() {
   const [selectedRaceId, setSelectedRaceId] = useState(1);
@@ -15,6 +16,7 @@ export default function RewindPage() {
   const [changes, setChanges] = useState([]);
   const { races, selectedRace, lapData, circuitPath, status } = useRaceData(selectedRaceId);
   const counterfactual = useCounterfactual();
+  const telemetry = useTelemetry(selectedRace?.id, currentLap);
 
   const laps = lapData.laps ?? [];
   const activeLap = useMemo(
@@ -24,44 +26,31 @@ export default function RewindPage() {
   const handleLapChange = useCallback((lap) => setCurrentLap(lap), []);
 
   return (
-    <main className="stack">
-      <section className="panel panel-pad">
-        <div className="control-row">
-          <label className="field">
-            <span>Race</span>
-            <select
-              value={selectedRace?.id ?? selectedRaceId}
-              onChange={(event) => {
-                setSelectedRaceId(Number(event.target.value));
-                setCurrentLap(1);
-              }}
-            >
-              {races.map((race) => (
-                <option key={race.id} value={race.id}>
-                  {race.season} {race.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="metric-strip">
-            <div className="metric">
-              <span>Circuit</span>
-              <strong>{selectedRace?.circuit_name ?? "Pending"}</strong>
-            </div>
-            <div className="metric">
-              <span>Round</span>
-              <strong>{selectedRace?.round ?? "-"}</strong>
-            </div>
-            <div className="metric">
-              <span>Source</span>
-              <strong>{status}</strong>
-            </div>
-          </div>
+    <>
+      <div className="race-bar">
+        <select
+          className="race-select"
+          value={selectedRace?.id ?? selectedRaceId}
+          onChange={(e) => {
+            setSelectedRaceId(Number(e.target.value));
+            setCurrentLap(1);
+          }}
+        >
+          {races.map((race) => (
+            <option key={race.id} value={race.id}>
+              {race.season} {race.name}
+            </option>
+          ))}
+        </select>
+        <div className="meta-pills">
+          <div className="meta-pill">Circuit <strong>{selectedRace?.circuit_name ?? "—"}</strong></div>
+          <div className="meta-pill">Round <strong>{selectedRace?.round ?? "—"}</strong></div>
+          <div className="meta-pill">Source <strong>{status}</strong></div>
         </div>
-      </section>
+      </div>
 
       <div className="page-grid">
-        <div className="stack">
+        <div className="left-col">
           <TrackCanvas
             laps={laps}
             circuitPath={circuitPath}
@@ -81,7 +70,11 @@ export default function RewindPage() {
             maxLap={laps.length || 1}
           />
         </div>
-        <div className="stack">
+
+        <div className="right-col">
+          <div className="section-header">
+            <span className="section-title">Leaderboard — Lap {currentLap}</span>
+          </div>
           <Leaderboard lap={activeLap} />
           <WhatIfPanel
             raceId={selectedRace?.id ?? selectedRaceId}
@@ -91,14 +84,12 @@ export default function RewindPage() {
             isRunning={counterfactual.isRunning}
           />
           {counterfactual.result?.explanation && (
-            <section className="panel panel-pad">
-              <h2>Simulation Note</h2>
-              <p>{counterfactual.result.explanation}</p>
-            </section>
+            <div className="sim-note" style={{ margin: "0 14px 12px" }}>
+              ✓ {counterfactual.result.explanation}
+            </div>
           )}
         </div>
       </div>
-    </main>
+    </>
   );
 }
-

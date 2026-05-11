@@ -1,7 +1,3 @@
-import { useRef } from "react";
-
-import { useTrackAnimation } from "./useTrackAnimation.js";
-
 export default function TrackCanvas({
   laps,
   circuitPath,
@@ -9,10 +5,14 @@ export default function TrackCanvas({
   isPlaying,
   currentLap,
   onLapChange,
-  cfLaps
+  cfLaps,
+  telemetry
 }) {
   const canvasRef = useRef(null);
-  useTrackAnimation({ canvasRef, laps, circuitPath, speed, isPlaying, currentLap, onLapChange, cfLaps });
+  useTrackAnimation({
+    canvasRef, laps, circuitPath, speed,
+    isPlaying, currentLap, onLapChange, cfLaps, telemetry
+  });
 
   return (
     <section className="panel track-panel" aria-label="Race track animation">
@@ -21,10 +21,9 @@ export default function TrackCanvas({
         <div className="track-hud">
           <span className="hud-pill">Lap {currentLap}</span>
           <span className="hud-pill">{speed}x</span>
-          <span className="hud-pill">{isPlaying ? "Live" : "Paused"}</span>
+          <span className="hud-pill live">● Live</span>
         </div>
       </div>
     </section>
   );
 }
-

@@ -32,3 +32,29 @@ def list_circuits(db: Session = Depends(get_db)):
         }
         for c in circuits
     ]
+    
+    
+@router.get("/telemetry/{race_id}/{lap}")
+def get_lap_telemetry(race_id: int, lap: int, db: Session = Depends(get_db)):
+    from db.models import TelemetryPath, Driver
+    rows = db.query(TelemetryPath, Driver.code).join(
+        Driver, TelemetryPath.driver_id == Driver.id
+    ).filter(
+        TelemetryPath.race_id == race_id,
+        TelemetryPath.lap == lap,
+    ).all()
+
+    return {
+        "race_id": race_id,
+        "lap": lap,
+        "drivers": [
+            {
+                "driver_id": tp.driver_id,
+                "code": code,
+                "path": tp.path,
+            }
+            for tp, code in rows
+        ]
+    }
+    
+    

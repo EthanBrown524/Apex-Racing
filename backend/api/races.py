@@ -71,4 +71,28 @@ def get_laps(race_id: int, db: Session = Depends(get_db)) -> dict:
         "race_id": race.id,
         "laps": [{"lap": lap, "drivers": drivers} for lap, drivers in grouped.items()],
     }
+    
+
+@router.get("/{race_id}/telemetry/{lap}")
+def get_lap_telemetry(race_id: int, lap: int, db: Session = Depends(get_db)) -> dict:
+    from db.models import TelemetryPath
+    rows = (
+        db.execute(
+            select(TelemetryPath, Driver.code)
+            .join(Driver, TelemetryPath.driver_id == Driver.id)
+            .where(TelemetryPath.race_id == race_id, TelemetryPath.lap == lap)
+        ).all()
+    )
+    return {
+        "race_id": race_id,
+        "lap": lap,
+        "drivers": [
+            {
+                "driver_id": tp.driver_id,
+                "code": code,
+                "path": tp.path,
+            }
+            for tp, code in rows
+        ],
+    }
 

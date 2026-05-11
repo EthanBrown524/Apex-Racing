@@ -1,37 +1,35 @@
 const speeds = [0.5, 1, 2, 4, 10];
 
-export default function PlaybackControls({ isPlaying, setIsPlaying, speed, setSpeed, currentLap, setCurrentLap, maxLap }) {
+export default function PlaybackControls({
+  isPlaying, setIsPlaying, speed, setSpeed,
+  currentLap, setCurrentLap, maxLap
+}) {
   return (
-    <section className="panel panel-pad">
-      <div className="control-row">
-        <button className="button" type="button" onClick={() => setIsPlaying(!isPlaying)}>
-          {isPlaying ? "Pause" : "Play"}
-        </button>
-        <button className="button secondary" type="button" onClick={() => setCurrentLap(1)}>
-          Reset
-        </button>
-        <label className="field">
-          <span>Speed</span>
-          <select value={speed} onChange={(event) => setSpeed(Number(event.target.value))}>
-            {speeds.map((value) => (
-              <option key={value} value={value}>
-                {value}x
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Lap</span>
-          <input
-            type="range"
-            min="1"
-            max={maxLap}
-            value={currentLap}
-            onChange={(event) => setCurrentLap(Number(event.target.value))}
-          />
-        </label>
+    <div className="controls-bar">
+      <button className="button" type="button" onClick={() => setIsPlaying(!isPlaying)}>
+        {isPlaying ? "⏸ Pause" : "▶ Play"}
+      </button>
+      <button className="button secondary" type="button" onClick={() => setCurrentLap(1)}>
+        ↺ Reset
+      </button>
+      <div className="field">
+        <span>Speed</span>
+        <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
+          {speeds.map((v) => (
+            <option key={v} value={v}>{v}x</option>
+          ))}
+        </select>
       </div>
-    </section>
+      <div className="field" style={{ flex: 1 }}>
+        <span>Lap {currentLap} / {maxLap}</span>
+        <input
+          type="range"
+          min="1"
+          max={maxLap}
+          value={currentLap}
+          onChange={(e) => setCurrentLap(Number(e.target.value))}
+        />
+      </div>
+    </div>
   );
 }
-
