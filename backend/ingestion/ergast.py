@@ -9,15 +9,30 @@ from db.models import Circuit, Constructor, Driver, LapTime, PitStop, Race, Race
 
 
 BASE_URL = os.getenv("ERGAST_BASE_URL", "https://api.jolpi.ca/ergast/f1")
-REQUEST_PAUSE_SECONDS = 0.5
+REQUEST_PAUSE_SECONDS = 1.5
 PAGE_LIMIT = 100
+MAX_RETRIES = 5
+RETRY_WAIT_SECONDS = 30
 
 
 def _get_json(path: str) -> dict:
-    response = requests.get(f"{BASE_URL}/{path}", timeout=30)
-    response.raise_for_status()
-    time.sleep(REQUEST_PAUSE_SECONDS)
-    return response.json()["MRData"]
+    for attempt in range(MAX_RETRIES):
+        try:
+            response = requests.get(f"{BASE_URL}/{path}", timeout=30)
+            if response.status_code == 429:
+                wait = RETRY_WAIT_SECONDS * (attempt + 1)
+                print(f"  Rate limited, waiting {wait}s before retry {attempt + 1}/{MAX_RETRIES}...", flush=True)
+                time.sleep(wait)
+                continue
+            response.raise_for_status()
+            time.sleep(REQUEST_PAUSE_SECONDS)
+            return response.json()["MRData"]
+        except requests.exceptions.HTTPError as e:
+            if attempt == MAX_RETRIES - 1:
+                raise
+            print(f"  HTTP error: {e}, retrying in {RETRY_WAIT_SECONDS}s...", flush=True)
+            time.sleep(RETRY_WAIT_SECONDS)
+    raise RuntimeError(f"Failed after {MAX_RETRIES} attempts: {path}")
 
 
 def _parse_time_ms(value: str | None) -> int | None:
@@ -102,16 +117,37 @@ def ingest_season(db: Session, year: int = 2023, rounds: list[int] | None = None
         race_query = race_query.filter(Race.round.in_(rounds))
 
     for race in race_query.order_by(Race.round.asc()).all():
+        # Skip if already fully ingested
+        existing_results = db.query(RaceResult).filter_by(race_id=race.id).count()
+        existing_laps = db.query(LapTime).filter_by(race_id=race.id).count()
+        existing_pits = db.query(PitStop).filter_by(race_id=race.id).count()
+
+        if existing_results > 0 and existing_laps > 0 and existing_pits > 0:
+            print(f"Skipping {year} round {race.round}: {race.name} (already ingested)", flush=True)
+            continue
+
         print(f"Ingesting {year} round {race.round}: {race.name}", flush=True)
-        ingest_race_results(db, year, race.round)
-        db.commit()
-        print("  results committed", flush=True)
-        ingest_lap_times(db, year, race.round)
-        db.commit()
-        print("  lap times committed", flush=True)
-        ingest_pit_stops(db, year, race.round)
-        db.commit()
-        print("  pit stops committed", flush=True)
+
+        if existing_results == 0:
+            ingest_race_results(db, year, race.round)
+            db.commit()
+            print("  results committed", flush=True)
+        else:
+            print("  results already exist, skipping", flush=True)
+
+        if existing_laps == 0:
+            ingest_lap_times(db, year, race.round)
+            db.commit()
+            print("  lap times committed", flush=True)
+        else:
+            print("  lap times already exist, skipping", flush=True)
+
+        if existing_pits == 0:
+            ingest_pit_stops(db, year, race.round)
+            db.commit()
+            print("  pit stops committed", flush=True)
+        else:
+            print("  pit stops already exist, skipping", flush=True)
 
 
 def ingest_drivers(db: Session, year: int) -> None:
@@ -215,7 +251,11 @@ def ingest_lap_times(db: Session, year: int, round_number: int) -> None:
 
                 lap_entries.append((driver, timing, time_ms, cumulative_by_driver.get(driver.id)))
 
-            leader_elapsed = min(elapsed for _, _, _, elapsed in lap_entries if elapsed is not None)
+            valid_entries = [(d, t, tm, e) for d, t, tm, e in lap_entries if e is not None]
+            if not valid_entries:
+                continue
+
+            leader_elapsed = min(elapsed for _, _, _, elapsed in valid_entries)
 
             for driver, timing, time_ms, elapsed in lap_entries:
                 lap_time = lap_cache.get((driver.id, lap_number))
