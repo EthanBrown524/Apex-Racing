@@ -31,6 +31,7 @@ class Circuit(Base):
     country: Mapped[str | None] = mapped_column(String(100))
     length_km: Mapped[float | None] = mapped_column(Numeric(6, 3))
     gps_path: Mapped[list[dict] | None] = mapped_column(JSONB)
+    gps_image: Mapped[str | None] = mapped_column(Text)
 
     races: Mapped[list["Race"]] = relationship(back_populates="circuit")
 
@@ -176,3 +177,4 @@ class Scenario(Base):
     race_id: Mapped[int | None] = mapped_column(ForeignKey("races.id"))
     changes: Mapped[list[dict]] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+

@@ -1,3 +1,6 @@
+import { useRef } from "react";
+import { useTrackAnimation } from "./useTrackAnimation.js";
+
 export default function TrackCanvas({
   laps,
   circuitPath,

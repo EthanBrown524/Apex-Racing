@@ -59,6 +59,7 @@ export default function RewindPage() {
             currentLap={currentLap}
             onLapChange={handleLapChange}
             cfLaps={counterfactual.result?.alt_laps}
+            telemetry={telemetry}
           />
           <PlaybackControls
             isPlaying={isPlaying}
