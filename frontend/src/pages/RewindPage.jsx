@@ -13,17 +13,25 @@ export default function RewindPage() {
   const [isPlaying, setIsPlaying] = useState(true);
   const [speed, setSpeed] = useState(1);
   const [currentLap, setCurrentLap] = useState(1);
+  const [resetSignal, setResetSignal] = useState(0);
   const [changes, setChanges] = useState([]);
   const { races, selectedRace, lapData, circuitPath, status } = useRaceData(selectedRaceId);
   const counterfactual = useCounterfactual();
   const telemetry = useTelemetry(selectedRace?.id, currentLap);
 
-  const laps = lapData.laps ?? [];
+  const laps = useMemo(() => lapData.laps ?? [], [lapData]);
   const activeLap = useMemo(
     () => laps.find((lap) => lap.lap === currentLap) ?? laps[0],
     [currentLap, laps]
   );
+
   const handleLapChange = useCallback((lap) => setCurrentLap(lap), []);
+
+  const handleReset = useCallback(() => {
+    setIsPlaying(false);
+    setCurrentLap(1);
+    setResetSignal((value) => value + 1);
+  }, []);
 
   return (
     <>
@@ -43,8 +51,8 @@ export default function RewindPage() {
           ))}
         </select>
         <div className="meta-pills">
-          <div className="meta-pill">Circuit <strong>{selectedRace?.circuit_name ?? "—"}</strong></div>
-          <div className="meta-pill">Round <strong>{selectedRace?.round ?? "—"}</strong></div>
+          <div className="meta-pill">Circuit <strong>{selectedRace?.circuit_name ?? "-"}</strong></div>
+          <div className="meta-pill">Round <strong>{selectedRace?.round ?? "-"}</strong></div>
           <div className="meta-pill">Source <strong>{status}</strong></div>
         </div>
       </div>
@@ -60,6 +68,7 @@ export default function RewindPage() {
             onLapChange={handleLapChange}
             cfLaps={counterfactual.result?.alt_laps}
             telemetry={telemetry}
+            resetSignal={resetSignal}
           />
           <PlaybackControls
             isPlaying={isPlaying}
@@ -69,12 +78,13 @@ export default function RewindPage() {
             currentLap={currentLap}
             setCurrentLap={setCurrentLap}
             maxLap={laps.length || 1}
+            onReset={handleReset}
           />
         </div>
 
         <div className="right-col">
           <div className="section-header">
-            <span className="section-title">Leaderboard — Lap {currentLap}</span>
+            <span className="section-title">Leaderboard - Lap {currentLap}</span>
           </div>
           <Leaderboard lap={activeLap} />
           <WhatIfPanel
@@ -86,7 +96,7 @@ export default function RewindPage() {
           />
           {counterfactual.result?.explanation && (
             <div className="sim-note" style={{ margin: "0 14px 12px" }}>
-              ✓ {counterfactual.result.explanation}
+              OK: {counterfactual.result.explanation}
             </div>
           )}
         </div>

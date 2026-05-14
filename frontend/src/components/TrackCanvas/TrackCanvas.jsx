@@ -9,12 +9,22 @@ export default function TrackCanvas({
   currentLap,
   onLapChange,
   cfLaps,
-  telemetry
+  telemetry,
+  resetSignal,
 }) {
   const canvasRef = useRef(null);
+
   useTrackAnimation({
-    canvasRef, laps, circuitPath, speed,
-    isPlaying, currentLap, onLapChange, cfLaps, telemetry
+    canvasRef,
+    laps,
+    circuitPath,
+    speed,
+    isPlaying,
+    currentLap,
+    onLapChange,
+    cfLaps,
+    telemetry,
+    resetSignal,
   });
 
   return (
@@ -24,7 +34,7 @@ export default function TrackCanvas({
         <div className="track-hud">
           <span className="hud-pill">Lap {currentLap}</span>
           <span className="hud-pill">{speed}x</span>
-          <span className="hud-pill live">● Live</span>
+          <span className="hud-pill live">Live</span>
         </div>
       </div>
     </section>

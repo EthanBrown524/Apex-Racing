@@ -78,7 +78,7 @@ def ingest_telemetry(db: Session, year: int, round_number: int) -> None:
             print(f"  Could not get laps for {code}: {e}")
             continue
 
-        print(f"  Processing {code} — {len(driver_laps)} laps")
+        print(f"  Processing {code} - {len(driver_laps)} laps")
 
         for _, lap_row in driver_laps.iterrows():
             try:

@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from db.connection import get_db
-from db.models import Circuit, Driver, LapTime, PitStop, Race
+from db.models import Circuit, Driver, LapTime, PitStop, Race, TelemetryPath
 
 
 router = APIRouter(prefix="/races", tags=["races"])
@@ -41,7 +41,9 @@ def get_laps(race_id: int, db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=404, detail="Race not found")
 
     pit_rows = db.execute(
-        select(PitStop.driver_id, PitStop.lap, PitStop.tire_out).where(PitStop.race_id == race_id)
+        select(PitStop.driver_id, PitStop.lap, PitStop.tire_out).where(
+            PitStop.race_id == race_id
+        )
     ).all()
     pit_lookup = {(driver_id, lap): tire_out for driver_id, lap, tire_out in pit_rows}
 
@@ -71,28 +73,28 @@ def get_laps(race_id: int, db: Session = Depends(get_db)) -> dict:
         "race_id": race.id,
         "laps": [{"lap": lap, "drivers": drivers} for lap, drivers in grouped.items()],
     }
-    
+
 
 @router.get("/{race_id}/telemetry/{lap}")
 def get_lap_telemetry(race_id: int, lap: int, db: Session = Depends(get_db)) -> dict:
-    from db.models import TelemetryPath
-    rows = (
-        db.execute(
-            select(TelemetryPath, Driver.code)
-            .join(Driver, TelemetryPath.driver_id == Driver.id)
-            .where(TelemetryPath.race_id == race_id, TelemetryPath.lap == lap)
-        ).all()
-    )
+    if db.get(Race, race_id) is None:
+        raise HTTPException(status_code=404, detail="Race not found")
+
+    rows = db.execute(
+        select(TelemetryPath, Driver.code)
+        .join(Driver, TelemetryPath.driver_id == Driver.id)
+        .where(TelemetryPath.race_id == race_id, TelemetryPath.lap == lap)
+    ).all()
+
     return {
         "race_id": race_id,
         "lap": lap,
         "drivers": [
             {
-                "driver_id": tp.driver_id,
+                "driver_id": telemetry_path.driver_id,
                 "code": code,
-                "path": tp.path,
+                "path": telemetry_path.path,
             }
-            for tp, code in rows
+            for telemetry_path, code in rows
         ],
     }
-

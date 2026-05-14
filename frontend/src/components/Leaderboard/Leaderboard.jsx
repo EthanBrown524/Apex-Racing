@@ -27,7 +27,7 @@ export default function Leaderboard({ lap }) {
             {driver.position === 1 ? "Leader" : `+${((driver.gap_ms ?? 0) / 1000).toFixed(1)}s`}
           </div>
           <div className={`tire-badge${driver.in_pit ? " pit" : ""}`}>
-            {driver.in_pit ? "PIT" : driver.tire ?? "—"}
+            {driver.in_pit ? "PIT" : driver.tire ?? "-"}
           </div>
         </div>
       ))}

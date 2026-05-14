@@ -35,8 +35,8 @@ export default function WhatIfPanel({ raceId, changes, setChanges, onRun, isRunn
         <div className="field">
           <span>Change</span>
           <select value={changeType} onChange={(e) => setChangeType(e.target.value)}>
-            {changeTypes.map((t) => (
-              <option key={t} value={t}>{t}</option>
+            {changeTypes.map((type) => (
+              <option key={type} value={type}>{type}</option>
             ))}
           </select>
         </div>
@@ -64,7 +64,7 @@ export default function WhatIfPanel({ raceId, changes, setChanges, onRun, isRunn
           onClick={() => onRun(raceId, changes)}
           disabled={isRunning || changes.length === 0}
         >
-          {isRunning ? "Running…" : "▶ Simulate"}
+          {isRunning ? "Running..." : "Simulate"}
         </button>
         <button className="button danger" type="button" onClick={() => setChanges([])}>
           Clear
@@ -72,9 +72,9 @@ export default function WhatIfPanel({ raceId, changes, setChanges, onRun, isRunn
       </div>
       {changes.length > 0 && (
         <ul className="change-list">
-          {changes.map((c, i) => (
-            <li key={i}>
-              {c.driver_code} {c.change_type} L{c.lap} → {String(c.value)}
+          {changes.map((change, index) => (
+            <li key={`${change.driver_code}-${change.change_type}-${change.lap}-${index}`}>
+              {change.driver_code} {change.change_type} L{change.lap} -&gt; {String(change.value)}
             </li>
           ))}
         </ul>

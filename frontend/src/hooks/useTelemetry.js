@@ -6,9 +6,13 @@ export function useTelemetry(raceId, currentLap) {
   const cacheRef = useRef({});
 
   useEffect(() => {
-    if (!raceId || !currentLap) return;
+    if (!raceId || !currentLap) {
+      setTelemetry(null);
+      return;
+    }
 
     const key = `${raceId}-${currentLap}`;
+    let ignore = false;
 
     // Return cached data immediately
     if (cacheRef.current[key]) {
@@ -16,14 +20,19 @@ export function useTelemetry(raceId, currentLap) {
       return;
     }
 
+    setTelemetry(null);
+
     fetchLapTelemetry(raceId, currentLap)
       .then((data) => {
+        if (ignore) return;
         if (data.drivers?.length > 0) {
           cacheRef.current[key] = data;
           setTelemetry(data);
         }
       })
-      .catch(() => setTelemetry(null));
+      .catch(() => {
+        if (!ignore) setTelemetry(null);
+      });
 
     // Prefetch next lap
     const nextKey = `${raceId}-${currentLap + 1}`;
@@ -36,6 +45,10 @@ export function useTelemetry(raceId, currentLap) {
         })
         .catch(() => {});
     }
+
+    return () => {
+      ignore = true;
+    };
   }, [raceId, currentLap]);
 
   return telemetry;

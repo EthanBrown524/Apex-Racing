@@ -12,29 +12,12 @@ export function useRaceData(selectedRaceId) {
   const circuitCache = useRef({});
   const lapCache = useRef({});
 
-  // Load all races on mount, then preload all circuit paths
   useEffect(() => {
     fetchRaces()
       .then((data) => {
         if (data.length > 0) {
           setRaces(data);
           setStatus("live");
-
-          // Preload all circuit paths in the background
-          const uniqueCircuits = [
-            ...new Map(data.map(r => [r.circuit_id, r])).values()
-          ];
-
-          uniqueCircuits.forEach((race) => {
-            if (!race.circuit_id) return;
-            fetchCircuitPath(race.circuit_id)
-              .then((pathData) => {
-                if (pathData.path?.length) {
-                  circuitCache.current[race.circuit_id] = pathData.path;
-                }
-              })
-              .catch(() => {});
-          });
         }
       })
       .catch(() => {
@@ -54,7 +37,19 @@ export function useRaceData(selectedRaceId) {
     if (selectedRace.circuit_id && circuitCache.current[selectedRace.circuit_id]) {
       setCircuitPath(circuitCache.current[selectedRace.circuit_id]);
     } else {
-      setCircuitPath([]); // Empty — no fake circular path
+      setCircuitPath([]);
+    }
+
+    // Fetch circuit path if not cached yet
+    if (selectedRace.circuit_id && !circuitCache.current[selectedRace.circuit_id]) {
+      fetchCircuitPath(selectedRace.circuit_id)
+        .then((data) => {
+          if (data.path?.length) {
+            circuitCache.current[selectedRace.circuit_id] = data.path;
+            setCircuitPath(data.path);
+          }
+        })
+        .catch(() => {});
     }
 
     // Skip if already fetched laps for this race
@@ -75,18 +70,6 @@ export function useRaceData(selectedRaceId) {
         }
       })
       .catch(() => setLapData(sampleLapData));
-
-    // Fetch circuit path if not cached yet
-    if (selectedRace.circuit_id && !circuitCache.current[selectedRace.circuit_id]) {
-      fetchCircuitPath(selectedRace.circuit_id)
-        .then((data) => {
-          if (data.path?.length) {
-            circuitCache.current[selectedRace.circuit_id] = data.path;
-            setCircuitPath(data.path);
-          }
-        })
-        .catch(() => {});
-    }
   }, [selectedRace]);
 
   return { races, selectedRace, lapData, circuitPath, status };

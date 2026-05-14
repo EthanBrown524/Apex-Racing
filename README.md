@@ -25,10 +25,12 @@ This repository has the initial project foundation:
 Create a local `.env` from `.env.example`, then install dependencies.
 
 ```powershell
+copy .env.example .env
 cd backend
 python -m venv .venv
 .\.venv\Scripts\activate
 pip install -r requirements.txt
+alembic upgrade head
 uvicorn main:app --reload --port 8000
 ```
 

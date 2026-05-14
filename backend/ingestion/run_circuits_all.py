@@ -126,7 +126,7 @@ def ingest_circuit_for_round(
         circuit.gps_path = normalized
         circuit.gps_image = render_circuit_image(normalized)
         db.commit()
-        print(f"    ✓ {circuit.name} — {len(normalized)} points, image rendered")
+        print(f"    OK {circuit.name} - {len(normalized)} points, image rendered")
         return True
 
     except Exception as e:

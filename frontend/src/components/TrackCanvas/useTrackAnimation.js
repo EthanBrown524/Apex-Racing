@@ -99,7 +99,7 @@ function drawCar(ctx, point, code, color, angle = 0, ghost = false, isLocked = f
   ctx.shadowColor = "rgba(0,0,0,0.6)";
   ctx.shadowBlur = 6;
 
-  // Main body — sleek teardrop shape
+  // Main body: sleek teardrop shape
   ctx.beginPath();
   ctx.moveTo(14, 0);           // nose
   ctx.bezierCurveTo(10, -4, -4, -5, -12, -4);  // left side
@@ -120,7 +120,7 @@ function drawCar(ctx, point, code, color, angle = 0, ghost = false, isLocked = f
   ctx.fillStyle = "rgba(10,10,20,0.85)";
   ctx.fill();
 
-  // Front wing — thin horizontal bar
+  // Front wing: thin horizontal bar
   ctx.beginPath();
   ctx.moveTo(13, -6);
   ctx.lineTo(16, -6);
@@ -132,7 +132,7 @@ function drawCar(ctx, point, code, color, angle = 0, ghost = false, isLocked = f
   ctx.lineWidth = 0.8;
   ctx.stroke();
 
-  // Rear wing — wider bar
+  // Rear wing: wider bar
   ctx.beginPath();
   ctx.moveTo(-12, -7);
   ctx.lineTo(-15, -7);
@@ -182,7 +182,9 @@ function drawCar(ctx, point, code, color, angle = 0, ghost = false, isLocked = f
 function getTelemetryPosition(path, elapsedMs, totalMs) {
   if (!path || path.length < 2) return null;
   const progress = Math.min(elapsedMs / totalMs, 1);
-  const targetMs = progress * (path[path.length - 1].t_ms || totalMs);
+  const startMs = path[0].t_ms ?? 0;
+  const endMs = path[path.length - 1].t_ms ?? totalMs;
+  const targetMs = startMs + progress * Math.max(endMs - startMs, 1);
 
   let lo = 0, hi = path.length - 1;
   while (lo < hi - 1) {
@@ -194,7 +196,7 @@ function getTelemetryPosition(path, elapsedMs, totalMs) {
   const a = path[lo];
   const b = path[hi];
   const span = (b.t_ms - a.t_ms) || 1;
-  const t = Math.min((targetMs - a.t_ms) / span, 1);
+  const t = Math.min(Math.max((targetMs - a.t_ms) / span, 0), 1);
 
   // Smooth angle using lookahead
   const lookAhead = Math.min(hi + 3, path.length - 1);
@@ -225,6 +227,7 @@ export function useTrackAnimation({
   onLapChange,
   cfLaps,
   telemetry,
+  resetSignal,
   showHeatmap = true,
   lockedDriver = null,
 }) {
@@ -238,6 +241,13 @@ export function useTrackAnimation({
     currentLapRef.current = currentLap;
     elapsedMsRef.current = 0;
   }, [currentLap]);
+
+  useEffect(() => {
+    elapsedMsRef.current = 0;
+    lastFrameRef.current = 0;
+    anglesRef.current = {};
+    viewportRef.current = { x: 0.5, y: 0.5, scale: 1, targetX: 0.5, targetY: 0.5, targetScale: 1 };
+  }, [resetSignal]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -344,5 +354,5 @@ export function useTrackAnimation({
 
     frameId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(frameId);
-  }, [canvasRef, laps, circuitPath, speed, isPlaying, onLapChange, cfLaps, telemetry, showHeatmap, lockedDriver]);
+  }, [canvasRef, laps, circuitPath, speed, isPlaying, onLapChange, cfLaps, telemetry, showHeatmap, lockedDriver, resetSignal]);
 }
