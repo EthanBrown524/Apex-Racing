@@ -1,6 +1,10 @@
 import GlossaryTerm from "../components/Glossary/GlossaryTerm.jsx";
+import { StatStrip } from "../components/StatHero/StatHero.jsx";
+import { useStats } from "../hooks/useStats.js";
 
 export default function AboutPage() {
+  const { data: stats } = useStats();
+
   return (
     <div className="library-shell">
       <div className="hero">
@@ -15,6 +19,17 @@ export default function AboutPage() {
           <GlossaryTerm term="VSC" />, or rewrite your favourite driver's championship.
         </p>
       </div>
+
+      {stats && (
+        <StatStrip
+          items={[
+            { label: "Grand Prix", value: stats.headline?.grand_prix ?? 0, accent: "#e8002d" },
+            { label: "Laps", value: stats.headline?.laps_recorded ?? 0, accent: "#4cc9f0" },
+            { label: "Telemetry points", value: stats.headline?.telemetry_points ?? 0, accent: "#2fbf71" },
+            { label: "RAG chunks", value: stats.embeddings ?? 0, accent: "#b98cff" },
+          ]}
+        />
+      )}
 
       <div className="feature-grid">
         <div className="feature-card">

@@ -152,7 +152,7 @@ psql -U postgres -d apex -c "\dt"
 
 ## 6. Ingest the 2019-2024 data
 
-**This is the long part.** Expect 30-90 minutes total depending on network + FastF1 cache state. The script is restart-safe - just re-run if it dies.
+**This is the long part.** Expect 30-90 minutes total depending on network + FastF1 cache state. The script is restart-safe - just re-run if it dies. `run_bulk.py` shows tqdm progress bars and prints a totals table at the end.
 
 ### 6a. Quick path (metadata + results + laps + pits, no telemetry)
 
@@ -163,23 +163,35 @@ cd backend
 python -m ingestion.run_bulk --years 2019 2020 2021 2022 2023 2024 --skip-telemetry --skip-embeddings
 ```
 
-### 6b. Add embeddings for AI/RAG (recommended for hackathon demo)
+### 6b. Faster path (run multiple seasons in parallel)
+
+If you have RAM + network bandwidth, ingest several seasons at once. Takes ~5-10 min.
+
+```powershell
+python -m ingestion.run_bulk --years 2019 2020 2021 2022 2023 2024 --skip-telemetry --skip-embeddings --parallel-years 3
+```
+
+`--parallel-years N` spins up N worker processes; each handles one season. Three is a safe ceiling on most laptops; the Ergast API rate-limits aggressively so going higher won't help.
+
+### 6c. Add embeddings for AI/RAG (recommended for hackathon demo)
 
 ```powershell
 python -m ingestion.embed_races --years 2019 2020 2021 2022 2023 2024
 ```
 
-### 6c. (Optional, slow) Add telemetry for animated car positions
+### 6d. (Optional, slow) Add telemetry for animated car positions
 
-This pulls per-driver per-lap x/y/speed paths via FastF1. Slowest phase - each race takes 1-3 min.
+Pulls per-driver per-lap x/y/speed paths via FastF1. Each race ~1-3 min sampled, ~5-15 min for `--full-telemetry`.
 
 ```powershell
 python -m ingestion.run_bulk --years 2023 2024 --skip-embeddings
+# Every lap (slow but cinematic):
+python -m ingestion.run_bulk --years 2024 --full-telemetry --skip-embeddings
 ```
 
 (Just the most recent two seasons keeps the demo cinematic without waiting an hour.)
 
-### 6d. (Optional) FIA stewards' decisions via Docling
+### 6e. (Optional) FIA stewards' decisions via Docling
 
 Drop FIA decision PDFs into `backend/fia_pdfs/` (download from https://www.fia.com/documents). Then:
 
@@ -190,6 +202,29 @@ python -m ingestion.fia_parser backend/fia_pdfs/
 If you only have one PDF for one race:
 ```powershell
 python -m ingestion.fia_parser backend/fia_pdfs/decision_47.pdf --race-id 42 --title "Decision 47 - Verstappen"
+```
+
+### 6f. Check progress at any time
+
+```powershell
+python -m ingestion.status
+```
+
+Prints something like:
+```
+  2019  [##########..............]  10 races |  3,254 laps |  178 pits |  840 telemetry |   40 embeds
+  2020  [#####################...]  17 races |  6,201 laps |  290 pits | 1,520 telemetry |   68 embeds
+  ...
+```
+
+### 6g. Backup / share the data
+
+Ingesting takes a while. Once it's done, dump the DB to JSON so you can restore on the demo laptop without re-running FastF1:
+
+```powershell
+python -m ingestion.export --out apex_dump.json
+# or skip telemetry to keep the file small:
+python -m ingestion.export --out apex_dump.json --skip-telemetry
 ```
 
 ---

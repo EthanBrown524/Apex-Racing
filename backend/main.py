@@ -17,6 +17,7 @@ from api import (
     races,
     scenarios,
     showcase,
+    stats,
 )
 from db.connection import dispose_engine
 
@@ -55,6 +56,7 @@ app.include_router(commentary.router)
 app.include_router(championship.router)
 app.include_router(showcase.router)
 app.include_router(health.router)
+app.include_router(stats.router)
 
 
 @app.get("/")

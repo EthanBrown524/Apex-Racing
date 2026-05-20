@@ -105,3 +105,8 @@ export async function fetchHealth() {
   const response = await apexClient.get("/health");
   return response.data;
 }
+
+export async function fetchStats() {
+  const response = await apexClient.get("/stats");
+  return response.data;
+}

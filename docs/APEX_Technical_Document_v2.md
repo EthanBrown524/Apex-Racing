@@ -18,7 +18,8 @@ APEX turns every Grand Prix from 2019-2024 into an editable timeline. Six routes
 | **What-If Lab** | `/rewind/:raceId` (right rail) | Apply strategy changes (7 types). The deterministic simulator recomputes the standings; Granite explains the new outcome with citations; **Realism Score** chip judges plausibility; **Championship Impact** card recomputes the season standings. |
 | **Glory Path** | `/glory/:raceId` | Pick a driver + target finish position. APEX greedy-searches the smallest set of changes that gets them there; Granite narrates the alternate storyline; animated position countdown shows P-start to P-achieved. |
 | **Forecast** | `/forecast/:raceId` | Win-probability bars + circuit-DNA radar derived from historical aggregates. |
-| **About** | `/about` | Stack overview, feature cards, F1-jargon glossary tooltips. |
+| **Stats** | `/stats` | Scale showcase - animated big numbers (races, laps, pit stops, telemetry points, RAG chunks), per-season progress bars, IBM stack panel. |
+| **About** | `/about` | Stack overview, feature cards, F1-jargon glossary tooltips, scale strip. |
 
 The whole UI runs against a single FastAPI service; the frontend never calls IBM endpoints directly. A `Footer` component fetches `/health` and surfaces live diagnostics (ingested race count, Granite status, pgvector status).
 
@@ -59,6 +60,8 @@ backend/
     championship.py       POST /championship/impact
     showcase.py           GET /showcase, GET /showcase/{scenario_id}
     health.py             GET /health (counts + Granite status + pgvector status)
+    stats.py              GET /stats (headline numbers + per-season progress
+                          + embedding source breakdown - drives /stats page)
   ai/
     granite.py            watsonx.ai text-generation client (55-min token cache)
     embeddings.py         watsonx.ai embedding client; hash-vector fallback when offline
@@ -78,7 +81,10 @@ backend/
     run_telemetry.py      per-driver per-lap x/y/speed paths
     fia_parser.py         Docling -> RAG (FIA stewards' decisions, race control logs)
     embed_races.py        synthesizes race-summary chunks and embeds them
-    run_bulk.py           orchestrates 2019-2024 across all four phases
+    run_bulk.py           orchestrates 2019-2024 across all four phases;
+                          tqdm progress bars, per-year summary, --parallel-years
+    status.py             CLI - print ingestion progress per season as bars
+    export.py             dump the DB to JSON for backup/portability
     _normalize.py         x/y point normalization helper (was backend/utils/)
   db/
     connection.py         SQLAlchemy engine + SessionLocal + get_db()
@@ -112,6 +118,9 @@ frontend/src/
     useAIChat.js          stateful conversation against POST /ai/ask
   pages/
     LibraryPage.jsx       race grid filtered by season + search; skeleton loaders
+                          + scale strip (Grand Prix / Laps / Pit stops / Data points)
+    StatsPage.jsx         scale showcase - animated big numbers + season bars
+                          + IBM stack panel
     ShowcasePage.jsx      curated demo cards; one-click launch with pre-filled changes
     RewindPage.jsx        TrackCanvas + Leaderboard + WhatIfPanel|AIChatBox + AINarrator
                           + ChampionshipImpact + RealismChip + keyboard shortcuts
@@ -134,7 +143,13 @@ frontend/src/
     Footer/               diagnostics-bound IBM-stack chip row
     Glossary/             F1-jargon hover-tooltip term wrapper
     KeyboardHints/        small Space/arrows/R legend under the track
+    StatHero/             animated count-up number + label; StatStrip wraps N
 ```
+
+  hooks/
+    useStats.js           fetches /stats, falls back to sampleStats
+    useCountUp.js         eased count-up animation hook + formatLargeNumber
+    ...existing hooks unchanged
 
 ---
 
@@ -302,14 +317,29 @@ Returns starting position, achieved position, applied changes with rationale str
 
 ```
 python -m ingestion.run_bulk --years 2019 2020 2021 2022 2023 2024
+python -m ingestion.run_bulk --years 2019 2020 --parallel-years 2   # 2 seasons concurrently
+python -m ingestion.run_bulk --years 2024 --full-telemetry          # every lap (slow)
+python -m ingestion.status                                          # progress bars
+python -m ingestion.export --out apex_dump.json                     # backup
 ```
 
 Per-year phases:
 
 1. **Ergast** - drivers, constructors, races, results, lap times, pit stops. Restart-safe; skips rounds where results+laps+pits already exist.
 2. **FastF1 circuit paths** - one path per circuit, idempotent (`Circuit.gps_path` is null-checked).
-3. **Telemetry sampling** - 10 evenly-spaced laps per race by default (full ingest with `--skip-telemetry` removed and a wider lap list).
+3. **Telemetry sampling** - 10 evenly-spaced laps per race by default (`--full-telemetry` ingests every lap).
 4. **Embeddings** - synthesizes 4 chunks per race (result, pit windows, safety cars, lead changes) and embeds via watsonx.
+
+`run_bulk.py` shows tqdm progress bars per phase and prints a totals table at
+the end (races / laps / pits / telemetry / embeddings counts and elapsed time).
+`--parallel-years N` runs N seasons concurrently via multiprocessing.
+
+`status.py` prints a current-state bar chart per season - useful for "did my
+overnight job finish?" and for screenshots in the demo.
+
+`export.py` dumps the entire DB to JSON so you can ingest once on a beefy
+machine and ship the dump to the demo laptop, skipping the slow FastF1 phase
+on demo day.
 
 FIA stewards' decisions are ingested independently:
 ```
@@ -325,6 +355,7 @@ python -m ingestion.fia_parser /path/to/decisions_dir
 |--------|------|--------------|---------|
 | GET | `/` | - | `{ status: "ok" }` |
 | GET | `/health` | - | `{ status, counts, seasons, pgvector_installed, granite_configured, embedding_sources, ingestion_complete }` |
+| GET | `/stats` | - | `{ headline, drivers, constructors, circuits, embeddings, season_breakdown, embedding_sources, years_target, total_expected_races, overall_progress }` |
 | GET | `/races` | - | `[{ id, name, season, round, circuit_id, circuit_name, date, total_laps }]` |
 | GET | `/races/{id}/laps` | - | `{ race_id, laps: [{ lap, drivers: [{ driver_id, code, position, gap_ms, time_ms, tire, in_pit }] }] }` |
 | GET | `/races/{id}/telemetry/{lap}` | - | `{ race_id, lap, drivers: [{ code, path: [{x,y,t_ms,speed}] }] }` |

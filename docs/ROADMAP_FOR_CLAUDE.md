@@ -17,6 +17,12 @@ Work top-to-bottom. Each task lists the **files** touched, what to **do**, and a
 - [x] Glossary tooltips (`Glossary/GlossaryTerm.jsx`) used on AboutPage
 - [x] Test suite: 18 passing pytest smoke tests under `backend/tests/`
 - [x] Folder restructure: `backend/utils/` removed, `frontend/src/data/`, `frontend/src/styles/` split
+- [x] Stats page (`/stats`) + `/stats` endpoint + StatHero/StatStrip animated count-ups
+- [x] Scale strip on Library + About showing live Grand Prix / Laps / Pit stops / Data points
+- [x] Better bulk ingestion: tqdm progress, per-year totals, `--parallel-years`, `--full-telemetry`
+- [x] `ingestion.status` CLI - per-season progress bars
+- [x] `ingestion.export` CLI - DB to JSON dump for portability
+- [x] Expanded `sampleData.js` from 1 race to 28 sample races across 2019-2024
 
 The remaining waves stay below.
 

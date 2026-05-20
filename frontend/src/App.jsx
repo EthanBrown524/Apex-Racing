@@ -7,6 +7,7 @@ import GloryPathPage from "./pages/GloryPathPage.jsx";
 import LibraryPage from "./pages/LibraryPage.jsx";
 import RewindPage from "./pages/RewindPage.jsx";
 import ShowcasePage from "./pages/ShowcasePage.jsx";
+import StatsPage from "./pages/StatsPage.jsx";
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <NavLink to="/rewind">Time Machine</NavLink>
           <NavLink to="/glory">Glory Path</NavLink>
           <NavLink to="/forecast">Forecast</NavLink>
+          <NavLink to="/stats">Stats</NavLink>
           <NavLink to="/about">About</NavLink>
         </nav>
       </header>
@@ -38,6 +40,7 @@ export default function App() {
         <Route path="/glory/:raceId" element={<GloryPathPage />} />
         <Route path="/forecast" element={<ForecastPage />} />
         <Route path="/forecast/:raceId" element={<ForecastPage />} />
+        <Route path="/stats" element={<StatsPage />} />
         <Route path="/about" element={<AboutPage />} />
       </Routes>
 

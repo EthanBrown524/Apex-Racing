@@ -1,0 +1,202 @@
+/* Stats page + reusable scale strip (used on Library + About). */
+
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  padding: 0 24px 24px;
+  position: relative;
+}
+
+.stat-strip-source {
+  position: absolute;
+  right: 24px;
+  bottom: 4px;
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.stat-hero {
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 160ms, transform 120ms, box-shadow 160ms;
+}
+.stat-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent, var(--f1-red)), transparent);
+}
+.stat-hero:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.stat-hero-value {
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  line-height: 1;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(180deg, #fff, #b3aa97);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.stat-hero-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--accent, var(--f1-red));
+  margin-top: 8px;
+}
+
+.stat-hero-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* Stats page big grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  padding: 0 24px 24px;
+}
+
+.stats-grid .stat-hero-value {
+  font-size: 56px;
+  letter-spacing: -2px;
+}
+
+.stats-section {
+  padding: 0 24px 24px;
+}
+.stats-section h2 {
+  margin: 6px 0 14px;
+  color: var(--text-dim);
+}
+
+.season-bars {
+  display: grid;
+  gap: 6px;
+}
+.season-bar-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 140px 50px;
+  align-items: center;
+  gap: 10px;
+}
+.season-bar-year {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.season-bar-track {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+.season-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ffd24a, #e8002d);
+  border-radius: 4px;
+  transition: width 600ms ease-out;
+}
+.season-bar-count {
+  font-size: 11px;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+}
+.season-bar-badge {
+  background: var(--f1-green);
+  color: #04150b;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.stats-overall {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--text-mid);
+}
+.stats-overall strong { color: var(--text); font-size: 14px; }
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  padding: 0 24px 32px;
+}
+.stats-card {
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.stats-card h3 {
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.stats-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-mid);
+}
+.stats-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px dashed var(--line);
+  padding: 5px 0;
+}
+.stats-list li:last-child { border-bottom: none; }
+.stats-list strong { color: var(--text); font-weight: 800; font-variant-numeric: tabular-nums; }
+.stats-tag {
+  background: rgba(76, 201, 240, 0.10);
+  color: var(--f1-cyan);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(76, 201, 240, 0.22);
+}
+
+.stats-footer-note {
+  padding: 0 24px 24px;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+@media (max-width: 560px) {
+  .stats-grid .stat-hero-value { font-size: 36px; }
+  .season-bar-row { grid-template-columns: 48px minmax(0, 1fr) 90px; }
+  .season-bar-badge { display: none; }
+}

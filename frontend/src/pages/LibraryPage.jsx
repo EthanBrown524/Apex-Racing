@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { SkeletonCard, SkeletonList } from "../components/Skeleton/Skeleton.jsx";
+import { StatStrip } from "../components/StatHero/StatHero.jsx";
 import { fetchRaces } from "../api/apexClient.js";
 import { sampleRaces } from "../data/sampleData.js";
+import { useStats } from "../hooks/useStats.js";
 
 const YEARS = [2024, 2023, 2022, 2021, 2020, 2019];
 
@@ -13,6 +15,7 @@ export default function LibraryPage() {
   const [year, setYear] = useState(YEARS[0]);
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
+  const { data: stats } = useStats();
 
   useEffect(() => {
     fetchRaces()
@@ -60,6 +63,17 @@ export default function LibraryPage() {
           a Glory Path for your favourite driver.
         </p>
       </div>
+
+      {stats && (
+        <StatStrip
+          items={[
+            { label: "Grand Prix", value: stats.headline?.grand_prix ?? 0, accent: "#e8002d" },
+            { label: "Laps", value: stats.headline?.laps_recorded ?? 0, accent: "#4cc9f0" },
+            { label: "Pit stops", value: stats.headline?.pit_stops ?? 0, accent: "#e7c04b" },
+            { label: "Data points", value: stats.headline?.total_data_points ?? 0, accent: "#2fbf71" },
+          ]}
+        />
+      )}
 
       <div className="library-toolbar">
         {(yearsAvailable.length ? yearsAvailable : YEARS).map((y) => (

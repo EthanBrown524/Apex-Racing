@@ -19,6 +19,7 @@ gets your favourite driver to P1.
 | **What-If Lab** | Apply pit / DNF / weather / safety-car / mechanical / grid-swap / fastest-lap changes; Granite explains with citations; **Realism Score** chip rates plausibility; **Championship Impact** card recomputes the season standings. |
 | **Glory Path** | Pick a driver + target finish. Greedy optimizer finds the minimum interventions; Granite narrates; animated `P-start -> P-achieved` hero. |
 | **Forecast** | Win-probability bars + circuit-DNA radar derived from historical aggregates. |
+| **Stats** | Scale showcase - animated big numbers (Grand Prix, laps, pit stops, telemetry points, RAG chunks) + per-season progress bars. |
 
 ## IBM stack
 
@@ -70,11 +71,22 @@ npm run dev
 
 ```bash
 cd backend
-python -m ingestion.run_bulk --years 2019 2020 2021 2022 2023 2024 --skip-telemetry --skip-embeddings
+
+# fastest: 3 seasons in parallel, skip telemetry
+python -m ingestion.run_bulk --years 2019 2020 2021 2022 2023 2024 \
+  --skip-telemetry --skip-embeddings --parallel-years 3
+
+# add the AI/RAG index
 python -m ingestion.embed_races --years 2019 2020 2021 2022 2023 2024
+
+# check what got ingested
+python -m ingestion.status
+
+# (optional) backup the DB so you can restore on a demo laptop
+python -m ingestion.export --out apex_dump.json
 ```
 
-The pipeline is restart-safe. See [`docs/SETUP_AND_INGEST.md`](docs/SETUP_AND_INGEST.md) for the full runbook.
+The pipeline shows tqdm progress bars and is restart-safe. See [`docs/SETUP_AND_INGEST.md`](docs/SETUP_AND_INGEST.md) for the full runbook.
 
 ## Run the tests
 
