@@ -1,4 +1,4 @@
-import { getDriverPrimary } from "../../teamColors.js";
+import { getDriverPrimary } from "../../data/teamColors.js";
 
 const TIRE_CLASS = {
   S: "soft",

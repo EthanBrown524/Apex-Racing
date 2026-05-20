@@ -20,16 +20,18 @@ from collections import defaultdict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ai.changes import (
+    GRID_DELTA_MS,
+    MECHANICAL_PENALTY_MS,
+    SC_PIT_SAVINGS_MS,
+    WEATHER_PENALTY_MS,
+    describe_change,
+    safe_int,
+)
 from ai.granite import generate
 from ai.rag import build_race_context
 from db.connection import SessionLocal
 from db.models import Driver, LapTime, PitStop, Race, SafetyCar
-
-
-WEATHER_PENALTY_MS = 1200
-MECHANICAL_PENALTY_MS = 800
-SC_PIT_SAVINGS_MS = 12000
-GRID_DELTA_MS = 350
 
 
 def _load_baseline(db: Session, race_id: int) -> dict:
@@ -121,7 +123,7 @@ def _apply_changes(baseline: dict, changes: list[dict]) -> dict[int, list[dict]]
             ]
 
         elif change_type == "fastest_lap" and driver_id is not None:
-            target_time_ms = _safe_int(value)
+            target_time_ms = safe_int(value)
             if target_time_ms is None or target_lap is None:
                 continue
             for lap in laps_by_driver[driver_id]:
@@ -131,7 +133,7 @@ def _apply_changes(baseline: dict, changes: list[dict]) -> dict[int, list[dict]]
 
         elif change_type == "mechanical" and driver_id is not None:
             start_lap = target_lap or 1
-            severity = _safe_int(value) or MECHANICAL_PENALTY_MS
+            severity = safe_int(value) or MECHANICAL_PENALTY_MS
             for lap in laps_by_driver[driver_id]:
                 if lap["lap"] >= start_lap and lap["time_ms"] is not None:
                     lap["time_ms"] += severity
@@ -153,7 +155,7 @@ def _apply_changes(baseline: dict, changes: list[dict]) -> dict[int, list[dict]]
                         lap["time_ms"] += penalty
 
         elif change_type == "safety_car":
-            start = _safe_int(value) or (target_lap or 10)
+            start = safe_int(value) or (target_lap or 10)
             end = start + 3
             for d_id, laps in laps_by_driver.items():
                 for lap in laps:
@@ -177,7 +179,7 @@ def _apply_changes(baseline: dict, changes: list[dict]) -> dict[int, list[dict]]
 
 
 def _apply_pit_lap(driver_laps: list[dict], target_lap, value, avg_pit_ms: int) -> None:
-    new_pit_lap = _safe_int(value) or _safe_int(target_lap)
+    new_pit_lap = safe_int(value) or safe_int(target_lap)
     if new_pit_lap is None:
         return
     for lap in driver_laps:
@@ -193,86 +195,65 @@ def _apply_pit_lap(driver_laps: list[dict], target_lap, value, avg_pit_ms: int) 
             break
 
 
-def _safe_int(value) -> int | None:
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        return None
-
-
 def _recompute_positions(
     laps_by_driver: dict[int, list[dict]],
     drivers_by_id: dict[int, str],
     total_laps: int,
 ) -> list[dict]:
+    """Recompute per-lap positions in O(N + L*D).
+
+    Pre-indexes each driver's laps by lap number so the per-lap scan is a
+    constant-time dict lookup rather than O(len(driver_laps)).
+    """
+    indexed: dict[int, dict[int, dict]] = {
+        driver_id: {lap["lap"]: lap for lap in laps}
+        for driver_id, laps in laps_by_driver.items()
+    }
     cumulative: dict[int, int] = {driver_id: 0 for driver_id in laps_by_driver}
-    lap_snapshots: dict[int, dict[int, dict]] = defaultdict(dict)
 
     all_lap_numbers = sorted(
-        {lap["lap"] for laps in laps_by_driver.values() for lap in laps}
+        {lap_num for driver_laps in indexed.values() for lap_num in driver_laps}
     )
 
+    alt_laps: list[dict] = []
     for lap_num in all_lap_numbers:
-        for driver_id, laps in laps_by_driver.items():
-            lap = next((l for l in laps if l["lap"] == lap_num), None)
+        snapshot: list[dict] = []
+        for driver_id, laps_by_lap in indexed.items():
+            lap = laps_by_lap.get(lap_num)
             if lap is None or lap.get("time_ms") is None:
                 continue
-            cumulative[driver_id] = cumulative.get(driver_id, 0) + lap["time_ms"]
-            lap_snapshots[lap_num][driver_id] = {
-                "driver_id": driver_id,
-                "code": drivers_by_id.get(driver_id, "???"),
-                "time_ms": lap["time_ms"],
-                "cumulative_ms": cumulative[driver_id],
-                "in_pit": lap.get("in_pit", False),
-            }
-
-    alt_laps = []
-    for lap_num in all_lap_numbers:
-        snapshot = lap_snapshots[lap_num]
-        ranked = sorted(snapshot.values(), key=lambda d: d["cumulative_ms"])
-        leader_ms = ranked[0]["cumulative_ms"] if ranked else 0
-
-        drivers_out = []
-        for position, driver in enumerate(ranked, start=1):
-            drivers_out.append(
+            cumulative[driver_id] += lap["time_ms"]
+            snapshot.append(
                 {
-                    "driver_id": driver["driver_id"],
-                    "code": driver["code"],
-                    "position": position,
-                    "time_ms": driver["time_ms"],
-                    "gap_ms": driver["cumulative_ms"] - leader_ms,
-                    "in_pit": driver["in_pit"],
+                    "driver_id": driver_id,
+                    "code": drivers_by_id.get(driver_id, "???"),
+                    "time_ms": lap["time_ms"],
+                    "cumulative_ms": cumulative[driver_id],
+                    "in_pit": lap.get("in_pit", False),
                 }
             )
 
-        alt_laps.append({"lap": lap_num, "drivers": drivers_out})
+        snapshot.sort(key=lambda d: d["cumulative_ms"])
+        leader_ms = snapshot[0]["cumulative_ms"] if snapshot else 0
+
+        alt_laps.append(
+            {
+                "lap": lap_num,
+                "drivers": [
+                    {
+                        "driver_id": d["driver_id"],
+                        "code": d["code"],
+                        "position": position,
+                        "time_ms": d["time_ms"],
+                        "gap_ms": d["cumulative_ms"] - leader_ms,
+                        "in_pit": d["in_pit"],
+                    }
+                    for position, d in enumerate(snapshot, start=1)
+                ],
+            }
+        )
 
     return alt_laps
-
-
-def _describe_change(c: dict) -> str:
-    ct = c.get("change_type")
-    dc = c.get("driver_code", "")
-    lap = c.get("lap")
-    val = c.get("value")
-    if ct == "pit_lap":
-        return f"{dc} pit moved to lap {val}"
-    if ct == "dnf":
-        return f"{dc} retires on lap {lap}"
-    if ct == "fastest_lap":
-        return f"{dc} sets {val} ms on lap {lap}"
-    if ct == "mechanical":
-        return f"{dc} mechanical issue from lap {lap} (+{val or MECHANICAL_PENALTY_MS} ms/lap)"
-    if ct == "weather":
-        benefits = (val or {}).get("benefits", []) if isinstance(val, dict) else []
-        return f"weather window from lap {lap}; favours {','.join(benefits) or 'none'}"
-    if ct == "safety_car":
-        return f"safety car lap {val or lap}"
-    if ct == "grid_swap":
-        return f"{dc} swaps grid with {val}"
-    return f"{dc} {ct}"
 
 
 def _build_granite_prompt(
@@ -318,7 +299,7 @@ def simulate_counterfactual(race_id: int, changes: list[dict]) -> dict:
             baseline["race"].total_laps or 0,
         )
 
-        change_summary = [_describe_change(c) for c in changes]
+        change_summary = [describe_change(c) for c in changes]
 
         actual_final_positions = {}
         for driver_id, laps in baseline["laps_by_driver"].items():

@@ -23,6 +23,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ai.changes import describe_change, strip_internal
 from ai.counterfactual import simulate_counterfactual
 from ai.granite import generate
 from ai.rag import build_race_context
@@ -150,10 +151,6 @@ def _candidate_changes(db: Session, race_id: int, driver_code: str) -> list[dict
     return candidates
 
 
-def _strip_internal(change: dict) -> dict:
-    return {k: v for k, v in change.items() if not k.startswith("_")}
-
-
 def find_glory_path(race_id: int, driver_code: str, target_position: int = 1) -> dict:
     driver_code = driver_code.upper().strip()
     with SessionLocal() as db:
@@ -203,7 +200,7 @@ def find_glory_path(race_id: int, driver_code: str, target_position: int = 1) ->
         if next_change is None:
             break
 
-        trial = applied + [_strip_internal(next_change)]
+        trial = applied + [strip_internal(next_change)]
         result = simulate_counterfactual(race_id, trial)
         new_positions = _final_positions(result.get("alt_laps", []))
         new_pos = new_positions.get(driver_code)
@@ -231,7 +228,7 @@ Achieved (alternate) position: P{achieved}
 Target was: P{target_position}
 
 Interventions applied (in order):
-{chr(10).join('- ' + _describe_change(c) for c in applied) or '- (none)'}
+{chr(10).join('- ' + describe_change(c) for c in applied) or '- (none)'}
 
 Context:
 {rag['context']}
@@ -261,11 +258,3 @@ Storyline:"""
     }
 
 
-def _describe_change(c: dict) -> str:
-    if c["change_type"] == "pit_lap":
-        return f"{c['driver_code']} pit moved to lap {c.get('value')}"
-    if c["change_type"] == "dnf":
-        return f"{c['driver_code']} retires on lap {c.get('lap')}"
-    if c["change_type"] == "fastest_lap":
-        return f"{c['driver_code']} sets {c.get('value')} ms on lap {c.get('lap')}"
-    return f"{c['driver_code']} {c['change_type']}"

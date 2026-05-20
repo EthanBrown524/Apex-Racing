@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 
 import Citations from "../components/Citations/Citations.jsx";
 import { fetchRaces } from "../api/apexClient.js";
-import { sampleRaces } from "../sampleData.js";
+import { sampleRaces } from "../data/sampleData.js";
 import { useGloryPath } from "../hooks/useGloryPath.js";
 
 export default function GloryPathPage() {

@@ -44,21 +44,23 @@ The whole UI runs against a single FastAPI service; the frontend never calls IBM
 ```
 backend/
   main.py                 FastAPI app; registers all routers; lifespan disposes engine
+  requirements.txt
+  alembic.ini
   api/
     races.py              GET /races, GET /races/{id}/laps, GET /races/{id}/telemetry/{lap}
     circuits.py           GET /circuits, GET /circuits/{id}/path
     counterfactual.py     POST /counterfactual/simulate
     forecast.py           GET /forecast/{race_id}
     scenarios.py          POST /scenarios, GET /scenarios
-    glory_path.py         POST /glory-path/solve           <-- new
-    commentary.py         GET /ai/commentary/{race_id}, POST /ai/ask  <-- new
+    glory_path.py         POST /glory-path/solve
+    commentary.py         GET /ai/commentary/{race_id}, POST /ai/ask
   ai/
     granite.py            watsonx.ai text-generation client (55-min token cache)
     embeddings.py         watsonx.ai embedding client; hash-vector fallback when offline
     rag.py                pgvector retrieve + upsert; race_id-scoped top-k
-    counterfactual.py     deterministic engine + Granite explanation
-                          change types: pit_lap, dnf, fastest_lap, mechanical,
-                                        weather, safety_car, grid_swap
+    changes.py            shared constants + describe_change() + safe_int()
+                          (used by counterfactual and glory_path - no duplication)
+    counterfactual.py     deterministic engine + Granite explanation; 7 change types
     glory_path.py         greedy search over candidate interventions
     commentary.py         narrative + free-form Q&A with RAG citations
     forecast.py           historical-form heuristic + circuit-DNA aggregation
@@ -69,6 +71,7 @@ backend/
     fia_parser.py         Docling -> RAG (FIA stewards' decisions, race control logs)
     embed_races.py        synthesizes race-summary chunks and embeds them
     run_bulk.py           orchestrates 2019-2024 across all four phases
+    _normalize.py         x/y point normalization helper (was backend/utils/)
   db/
     connection.py         SQLAlchemy engine + SessionLocal + get_db()
     models.py             11 ORM models; pgvector Vector(1536) for race_embeddings
@@ -79,10 +82,19 @@ backend/
 
 ```
 frontend/src/
+  main.jsx                React entry; imports styles/index.css and renders <App/>
   App.jsx                 Router shell with topbar nav (Library / Time Machine / Glory Path / Forecast / About)
-  styles.css              Single global stylesheet, broadcast-grade dark theme
-  teamColors.js           Team -> color map for 2019-2024, per-driver lookup
-  api/apexClient.js       Axios wrapper for every backend endpoint
+  api/
+    apexClient.js         Axios wrapper for every backend endpoint
+  data/                   Static data + fallbacks (no React, no logic)
+    sampleData.js         Offline fallback races + laps + circuit path
+    teamColors.js         Team -> color map for 2019-2024, per-driver lookup
+  styles/                 Single-theme CSS split by concern; index.css imports the rest
+    index.css             Entry point - just @imports the four below in order
+    base.css              :root design tokens, reset, typography, keyframes
+    layout.css            App shell, topbar, nav, page grids, race bar, responsive
+    components.css        Buttons, forms, leaderboard, track HUD, what-if, citations, ai chat
+    pages.css             Library grid, Glory hero, Forecast layout, About hero
   hooks/
     useRaceData.js        races + circuit path + lap data, with per-race cache
     useTelemetry.js       per-lap telemetry prefetch
@@ -208,6 +220,17 @@ Located in `ai/counterfactual.py`. Loads every lap-time row for the race, copies
   "alt_top5":    ["VER", "HAM", "PER", "ALO", "RUS"]
 }
 ```
+
+### Performance notes
+
+- `_recompute_positions` pre-indexes each driver's laps by lap number, turning
+  the per-lap scan from O(len(driver_laps)) to O(1) per driver. For a 70-lap
+  race with 20 drivers that's ~28k fewer comparisons.
+- `_circuit_dna` runs three `SELECT COUNT(...)` round-trips instead of
+  materializing every row and calling `len()` client-side. One historical
+  query per stat, not one per race.
+- `ai/changes.py` centralizes `describe_change()` and `safe_int()` so the
+  counterfactual engine and Glory Path narrator can't drift out of sync.
 
 ---
 

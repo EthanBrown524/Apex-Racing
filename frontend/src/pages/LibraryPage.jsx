@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { fetchRaces } from "../api/apexClient.js";
-import { sampleRaces } from "../sampleData.js";
+import { sampleRaces } from "../data/sampleData.js";
 
 const YEARS = [2024, 2023, 2022, 2021, 2020, 2019];
 

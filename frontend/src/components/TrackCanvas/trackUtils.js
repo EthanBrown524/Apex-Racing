@@ -1,4 +1,4 @@
-import { getDriverPrimary } from "../../teamColors.js";
+import { getDriverPrimary } from "../../data/teamColors.js";
 
 export function pointOnPath(path, progress) {
   if (!path.length) return { x: 0.5, y: 0.5 };

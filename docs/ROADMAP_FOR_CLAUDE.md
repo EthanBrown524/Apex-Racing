@@ -12,6 +12,21 @@ Prerequisites you can take for granted:
 
 When in doubt: read `docs/APEX_Technical_Document_v2.md` first.
 
+### Where to put new files
+
+| You're adding... | Put it in |
+|------------------|-----------|
+| A new FastAPI router | `backend/api/<name>.py`, register in `backend/main.py` |
+| AI logic (prompt, retrieval, search) | `backend/ai/<name>.py` |
+| A shared change-type helper | extend `backend/ai/changes.py`, don't duplicate |
+| An ingestion script | `backend/ingestion/<name>.py` (private helpers prefixed `_`) |
+| A SQLAlchemy model field | `backend/db/models.py` + new Alembic migration |
+| A page | `frontend/src/pages/<Name>Page.jsx`, route in `App.jsx` |
+| A reusable widget | `frontend/src/components/<Name>/<Name>.jsx` |
+| A hook | `frontend/src/hooks/use<Name>.js` |
+| Static data / fallbacks (no logic) | `frontend/src/data/<name>.js` |
+| New CSS | the appropriate file in `frontend/src/styles/` (base / layout / components / pages). Don't create `styles.css` again. |
+
 ---
 
 ## Wave 1 - Data & ingestion (low risk, high value)
@@ -53,7 +68,7 @@ python -m ingestion.fia_parser backend/fia_pdfs/
 
 ### Task 1.3 - Seed sample fallback for Glory Path
 
-Currently `LibraryPage` falls back to `sampleData.sampleRaces` (one race only) when the backend is unreachable. Extend `frontend/src/sampleData.js` so a no-backend demo can still show Library cards for at least four races across two seasons. Don't touch anything else.
+Currently `LibraryPage` falls back to `sampleData.sampleRaces` (one race only) when the backend is unreachable. Extend `frontend/src/data/sampleData.js` so a no-backend demo can still show Library cards for at least four races across two seasons. Don't touch anything else.
 
 **Acceptance:** stop the backend, reload `/`, you still see ≥4 race cards.
 
@@ -65,7 +80,7 @@ These tasks are pure CSS / small JSX tweaks. No new endpoints.
 
 ### Task 2.1 - Hover preview for citation chips
 
-**Files:** `frontend/src/components/Citations/Citations.jsx`, `frontend/src/styles.css`
+**Files:** `frontend/src/components/Citations/Citations.jsx`, `frontend/src/styles/components.css`
 
 Right now hovering a `.citation` chip shows the full snippet through the `title=` attribute. Replace that with a styled popover (CSS-only, using `position: absolute` and `:hover`). Show: title, score, snippet first 240 chars.
 
@@ -73,7 +88,7 @@ Right now hovering a `.citation` chip shows the full snippet through the `title=
 
 ### Task 2.2 - Pulse the leader pill
 
-**Files:** `frontend/src/styles.css` (extend `.hud-pill.live`)
+**Files:** `frontend/src/styles/components.css` (extend `.hud-pill.live`)
 
 Add a second pulse keyframe that scales the green dot from 1 -> 1.6 -> 1 every 1.6s.
 
@@ -83,13 +98,13 @@ Add a second pulse keyframe that scales the green dot from 1 -> 1.6 -> 1 every 1
 
 **Files:** `frontend/src/components/Leaderboard/Leaderboard.jsx`, `frontend/src/pages/LibraryPage.jsx`
 
-While `lap === undefined` or `races.length === 0 && status === 'loading'`, render 6 skeleton rows / 6 skeleton cards (gray rectangles with `@keyframes shimmer`). Add the `.skeleton` and `.shimmer` keyframe to `styles.css`.
+While `lap === undefined` or `races.length === 0 && status === 'loading'`, render 6 skeleton rows / 6 skeleton cards (gray rectangles with `@keyframes shimmer`). Add the `.skeleton` and `.shimmer` keyframe to `styles/base.css` (so the keyframe sits with the other animation tokens).
 
 **Acceptance:** with the backend down, reload `/` and see skeletons before the empty-state.
 
 ### Task 2.4 - Glory Path animation
 
-**Files:** `frontend/src/pages/GloryPathPage.jsx`, `frontend/src/styles.css`
+**Files:** `frontend/src/pages/GloryPathPage.jsx`, `frontend/src/styles/pages.css`
 
 When `glory.result` arrives, animate the hero numbers `Pn -> Pm`. Use a `useEffect` that counts down `starting_position` -> `achieved_position` over 600ms (one position per ~80ms). Animate the green arrow with a horizontal slide-in.
 

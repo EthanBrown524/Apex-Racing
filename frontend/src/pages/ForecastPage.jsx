@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import CircuitDNA from "../components/CircuitDNA/CircuitDNA.jsx";
 import ForecastDashboard from "../components/ForecastDashboard/ForecastDashboard.jsx";
 import { fetchForecast, fetchRaces } from "../api/apexClient.js";
-import { sampleRaces } from "../sampleData.js";
+import { sampleRaces } from "../data/sampleData.js";
 
 const SAMPLE_FORECAST = {
   predictions: [

@@ -14,9 +14,10 @@ export default function AIChatBox({ raceId }) {
   const [input, setInput] = useState("");
   const chat = useAIChat(raceId);
 
-  function submit() {
-    if (!input.trim()) return;
-    chat.ask(input.trim());
+  function submit(text) {
+    const value = (text ?? input).trim();
+    if (!value) return;
+    chat.ask(value);
     setInput("");
   }
 
@@ -35,7 +36,7 @@ export default function AIChatBox({ raceId }) {
         <button
           type="button"
           className="button primary"
-          onClick={submit}
+          onClick={() => submit()}
           disabled={chat.isSending || !raceId}
         >
           {chat.isSending ? "..." : "Ask"}
@@ -44,16 +45,14 @@ export default function AIChatBox({ raceId }) {
 
       {chat.messages.length === 0 && (
         <div className="ai-chat-empty">
-          Try: {SUGGESTIONS.map((s, i) => (
+          Try:{" "}
+          {SUGGESTIONS.map((s, i) => (
             <button
               key={i}
               type="button"
               className="button ghost"
               style={{ margin: "4px 4px 0 0", fontSize: 10 }}
-              onClick={() => {
-                setInput(s);
-                setTimeout(submit, 0);
-              }}
+              onClick={() => submit(s)}
             >
               {s}
             </button>
@@ -65,7 +64,15 @@ export default function AIChatBox({ raceId }) {
         <div className="ai-chat-history">
           {chat.messages.map((m, i) => (
             <div key={i} className={`ai-chat-message ${m.role}`}>
-              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.5, color: "var(--text-dim)", marginBottom: 4 }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: 0.5,
+                  color: "var(--text-dim)",
+                  marginBottom: 4,
+                }}
+              >
                 {m.role === "user" ? "YOU" : "GRANITE"}
               </div>
               <div>{m.text}</div>

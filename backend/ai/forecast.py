@@ -1,92 +1,83 @@
 """Race forecast - uses historical results at the same circuit + recent form
 to produce predictions and a "circuit DNA" radar.
 
-When there's no data we still return a deterministic, plausible shape so the
-frontend always has something to render.
+Falls back to a plausible default shape when there's no data so the frontend
+always has something to render.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from db.connection import SessionLocal
-from db.models import (
-    Circuit,
-    Driver,
-    LapTime,
-    PitStop,
-    Race,
-    RaceResult,
-    SafetyCar,
-)
+from db.models import Driver, LapTime, PitStop, Race, RaceResult, SafetyCar
+
+
+DEFAULT_DNA = {
+    "overtaking": 0.5,
+    "tire_deg": 0.5,
+    "safety_car_prob": 0.3,
+    "weather_risk": 0.2,
+}
 
 
 def _circuit_dna(db: Session, circuit_id: int | None) -> dict:
-    """0-1 scaled traits derived from historical race telemetry at the circuit."""
-    base = {
-        "overtaking": 0.5,
-        "tire_deg": 0.5,
-        "safety_car_prob": 0.3,
-        "weather_risk": 0.2,
-    }
+    """0-1 scaled traits derived from historical races at the circuit.
+
+    One round-trip per stat instead of one per race.
+    """
     if circuit_id is None:
-        return base
+        return dict(DEFAULT_DNA)
 
     race_ids = [
-        r[0]
-        for r in db.execute(
-            select(Race.id).where(Race.circuit_id == circuit_id)
-        ).all()
+        r[0] for r in db.execute(select(Race.id).where(Race.circuit_id == circuit_id)).all()
     ]
     if not race_ids:
-        return base
+        return dict(DEFAULT_DNA)
 
-    sc_count = db.execute(
-        select(SafetyCar.id).where(SafetyCar.race_id.in_(race_ids))
-    ).all()
-    pit_count = db.execute(
-        select(PitStop.id).where(PitStop.race_id.in_(race_ids))
-    ).all()
+    n_races = len(race_ids)
 
-    races_with_sc = len({_sc_race_id(db, r) for r in race_ids if _sc_race_id(db, r)})
-    safety_car_prob = min(1.0, races_with_sc / max(1, len(race_ids)))
+    races_with_sc = db.scalar(
+        select(func.count(func.distinct(SafetyCar.race_id))).where(
+            SafetyCar.race_id.in_(race_ids)
+        )
+    ) or 0
+    safety_car_prob = min(1.0, races_with_sc / n_races)
 
-    avg_pits = len(pit_count) / max(1, len(race_ids))
-    tire_deg = min(1.0, avg_pits / 50.0)
+    pit_total = db.scalar(
+        select(func.count(PitStop.id)).where(PitStop.race_id.in_(race_ids))
+    ) or 0
+    tire_deg = min(1.0, (pit_total / n_races) / 50.0)
 
-    leader_changes = _leader_changes_avg(db, race_ids)
-    overtaking = min(1.0, leader_changes / 6.0)
+    overtaking = min(1.0, _leader_changes_avg(db, race_ids) / 6.0)
 
     return {
         "overtaking": round(overtaking, 2),
         "tire_deg": round(tire_deg, 2),
         "safety_car_prob": round(safety_car_prob, 2),
-        "weather_risk": 0.2,
+        "weather_risk": DEFAULT_DNA["weather_risk"],
     }
 
 
-def _sc_race_id(db: Session, race_id: int) -> int | None:
-    row = db.execute(
-        select(SafetyCar.race_id).where(SafetyCar.race_id == race_id).limit(1)
-    ).first()
-    return row[0] if row else None
-
-
 def _leader_changes_avg(db: Session, race_ids: list[int]) -> float:
+    """Average number of distinct-leader transitions per race.
+
+    One SQL round-trip, grouped client-side by race_id.
+    """
     if not race_ids:
         return 0.0
+
     rows = db.execute(
-        select(LapTime.race_id, LapTime.lap, LapTime.position, LapTime.driver_id)
+        select(LapTime.race_id, LapTime.lap, LapTime.driver_id)
         .where(LapTime.race_id.in_(race_ids), LapTime.position == 1)
         .order_by(LapTime.race_id.asc(), LapTime.lap.asc())
     ).all()
 
     by_race: dict[int, list[int]] = defaultdict(list)
-    for race_id, _lap, _pos, driver_id in rows:
+    for race_id, _lap, driver_id in rows:
         if driver_id is not None:
             by_race[race_id].append(driver_id)
 
@@ -103,38 +94,47 @@ def _leader_changes_avg(db: Session, race_ids: list[int]) -> float:
 
 
 def _recent_form(db: Session, target_race: Race, lookback: int = 5) -> list[dict]:
-    """Aggregate finish position + points across the most recent {lookback}
+    """Per-driver average finish + points across the most recent {lookback}
     races strictly before the target race."""
     if target_race.season_year is None or target_race.round is None:
         return []
 
-    rows = db.execute(
-        select(Race.id, Race.season_year, Race.round)
-        .where(
-            (Race.season_year < target_race.season_year)
-            | (
-                (Race.season_year == target_race.season_year)
-                & (Race.round < target_race.round)
+    recent_ids = [
+        r[0]
+        for r in db.execute(
+            select(Race.id)
+            .where(
+                (Race.season_year < target_race.season_year)
+                | (
+                    (Race.season_year == target_race.season_year)
+                    & (Race.round < target_race.round)
+                )
             )
-        )
-        .order_by(Race.season_year.desc(), Race.round.desc())
-        .limit(lookback)
-    ).all()
-    recent_ids = [r.id for r in rows]
+            .order_by(Race.season_year.desc(), Race.round.desc())
+            .limit(lookback)
+        ).all()
+    ]
     if not recent_ids:
         return []
 
     results = db.execute(
-        select(RaceResult.driver_id, RaceResult.final_position, RaceResult.points, Driver.code)
+        select(
+            RaceResult.driver_id,
+            RaceResult.final_position,
+            RaceResult.points,
+            Driver.code,
+        )
         .join(Driver, RaceResult.driver_id == Driver.id)
         .where(RaceResult.race_id.in_(recent_ids))
     ).all()
 
-    agg: dict[int, dict] = defaultdict(lambda: {"races": 0, "avg_pos": 0, "points": 0, "code": "?"})
+    agg: dict[int, dict] = defaultdict(
+        lambda: {"races": 0, "pos_sum": 0, "points": 0.0, "code": "?"}
+    )
     for driver_id, pos, points, code in results:
         bucket = agg[driver_id]
         bucket["races"] += 1
-        bucket["avg_pos"] += int(pos or 20)
+        bucket["pos_sum"] += int(pos or 20)
         bucket["points"] += float(points or 0)
         bucket["code"] = code or bucket["code"]
 
@@ -142,7 +142,7 @@ def _recent_form(db: Session, target_race: Race, lookback: int = 5) -> list[dict
     for driver_id, bucket in agg.items():
         if bucket["races"] == 0:
             continue
-        avg_pos = bucket["avg_pos"] / bucket["races"]
+        avg_pos = bucket["pos_sum"] / bucket["races"]
         win_pct = max(0.01, min(0.95, (21 - avg_pos) / 20))
         forecast.append(
             {
@@ -190,12 +190,7 @@ def build_forecast(race_id: int) -> dict:
             return {
                 "race_id": race_id,
                 "predictions": [],
-                "circuit_dna": {
-                    "overtaking": 0.0,
-                    "tire_deg": 0.0,
-                    "safety_car_prob": 0.0,
-                    "weather_risk": 0.0,
-                },
+                "circuit_dna": {k: 0.0 for k in DEFAULT_DNA},
                 "risk_factors": ["Race not found"],
             }
 
