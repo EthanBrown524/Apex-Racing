@@ -5,7 +5,7 @@ import fastf1.plotting
 from sqlalchemy.orm import Session
 
 from db.models import Circuit, Race
-from utils.normalize import normalize_points
+from ingestion._normalize import normalize_points
 
 CACHE_DIR = Path(__file__).resolve().parents[2] / "fastf1_cache"
 fastf1.Cache.enable_cache(str(CACHE_DIR))

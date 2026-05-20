@@ -11,4 +11,8 @@ requests
 httpx
 pgvector
 docling
+tqdm
+
+# Test-only
+pytest
 

@@ -1,6 +1,97 @@
 {
-  "name": "apex-forecast-flow",
-  "description": "Placeholder Langflow export for race forecast generation.",
-  "nodes": []
+  "name": "APEX Forecast",
+  "description": "Race forecast for a given Grand Prix: aggregates historical results at the circuit, recent driver form, derives circuit-DNA traits, and surfaces risk factors.",
+  "is_component": false,
+  "tags": ["apex", "f1", "forecast"],
+  "data": {
+    "viewport": { "x": 0, "y": 0, "zoom": 1 },
+    "nodes": [
+      {
+        "id": "race_in",
+        "type": "genericNode",
+        "position": { "x": 80, "y": 80 },
+        "data": {
+          "type": "TextInput",
+          "node": {
+            "display_name": "Race ID",
+            "base_classes": ["Text"]
+          }
+        }
+      },
+      {
+        "id": "history_results",
+        "type": "genericNode",
+        "position": { "x": 360, "y": 40 },
+        "data": {
+          "type": "SQL",
+          "node": {
+            "display_name": "Recent results (lookback=5)",
+            "description": "Last 5 races strictly before the target - per-driver average finish and points.",
+            "base_classes": ["Table"]
+          }
+        }
+      },
+      {
+        "id": "circuit_dna",
+        "type": "genericNode",
+        "position": { "x": 360, "y": 200 },
+        "data": {
+          "type": "SQL",
+          "node": {
+            "display_name": "Circuit DNA",
+            "description": "Aggregates historical races at this circuit: SC frequency, pit count, leader changes, weather risk baseline.",
+            "base_classes": ["JSON"]
+          }
+        }
+      },
+      {
+        "id": "compute_winpct",
+        "type": "genericNode",
+        "position": { "x": 640, "y": 40 },
+        "data": {
+          "type": "PythonFunction",
+          "node": {
+            "display_name": "Win % heuristic",
+            "description": "win_pct = clamp((21 - avg_pos) / 20, 0.01, 0.95). Strategy text depends on average finish band.",
+            "base_classes": ["List"]
+          }
+        }
+      },
+      {
+        "id": "risk_text",
+        "type": "genericNode",
+        "position": { "x": 640, "y": 200 },
+        "data": {
+          "type": "PythonFunction",
+          "node": {
+            "display_name": "Risk factor generator",
+            "description": "Maps circuit DNA traits to human-readable risk callouts.",
+            "base_classes": ["List"]
+          }
+        }
+      },
+      {
+        "id": "output",
+        "type": "genericNode",
+        "position": { "x": 920, "y": 120 },
+        "data": {
+          "type": "JSONOutput",
+          "node": {
+            "display_name": "Forecast payload",
+            "description": "{ race_id, predictions[], circuit_dna, risk_factors[] }",
+            "base_classes": ["JSON"]
+          }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "f1", "source": "race_in", "target": "history_results" },
+      { "id": "f2", "source": "race_in", "target": "circuit_dna" },
+      { "id": "f3", "source": "history_results", "target": "compute_winpct" },
+      { "id": "f4", "source": "circuit_dna", "target": "risk_text" },
+      { "id": "f5", "source": "compute_winpct", "target": "output" },
+      { "id": "f6", "source": "risk_text", "target": "output" },
+      { "id": "f7", "source": "circuit_dna", "target": "output" }
+    ]
+  }
 }
-

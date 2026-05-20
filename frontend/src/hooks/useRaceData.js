@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { fetchCircuitPath, fetchRaceLaps, fetchRaces } from "../api/apexClient.js";
-import { sampleLapData, sampleRaces } from "../sampleData.js";
+import { sampleLapData, sampleRaces } from "../data/sampleData.js";
 
 export function useRaceData(selectedRaceId) {
   const [races, setRaces] = useState([]);

@@ -1,6 +1,151 @@
 {
-  "name": "apex-counterfactual-flow",
-  "description": "Placeholder Langflow export for counterfactual race explanations.",
-  "nodes": []
+  "name": "APEX Counterfactual Pipeline",
+  "description": "What-If Lab pipeline: collect strategy changes -> retrieve race context with Granite embeddings -> recompute positions -> Granite explanation with citations.",
+  "is_component": false,
+  "tags": ["apex", "f1", "watsonx", "granite", "rag"],
+  "data": {
+    "viewport": { "x": 0, "y": 0, "zoom": 0.95 },
+    "nodes": [
+      {
+        "id": "input_race",
+        "type": "genericNode",
+        "position": { "x": 80, "y": 80 },
+        "data": {
+          "type": "TextInput",
+          "node": {
+            "display_name": "Race + Changes",
+            "description": "JSON body: { race_id, changes[] }",
+            "base_classes": ["Text"],
+            "template": {
+              "value": { "type": "str", "value": "{ \"race_id\": 1, \"changes\": [] }" }
+            }
+          }
+        }
+      },
+      {
+        "id": "embed_query",
+        "type": "genericNode",
+        "position": { "x": 360, "y": 80 },
+        "data": {
+          "type": "WatsonxEmbeddings",
+          "node": {
+            "display_name": "Granite / Slate Embedder",
+            "description": "ibm/slate-30m-english-rtrvr - converts the change description into a query vector.",
+            "base_classes": ["Vector"],
+            "template": {
+              "model_id": { "type": "str", "value": "ibm/slate-30m-english-rtrvr" },
+              "watsonx_url": { "type": "str", "value": "${WATSONX_URL}" },
+              "project_id": { "type": "str", "value": "${WATSONX_PROJECT_ID}" }
+            }
+          }
+        }
+      },
+      {
+        "id": "pgvector_retrieve",
+        "type": "genericNode",
+        "position": { "x": 640, "y": 80 },
+        "data": {
+          "type": "PGVectorRetriever",
+          "node": {
+            "display_name": "PGVector Top-K",
+            "description": "ORDER BY embedding <=> query LIMIT 6, optionally filtered by race_id. Returns race narrative chunks + FIA decisions.",
+            "base_classes": ["Documents"],
+            "template": {
+              "table": { "type": "str", "value": "race_embeddings" },
+              "top_k": { "type": "int", "value": 6 },
+              "filter_field": { "type": "str", "value": "race_id" }
+            }
+          }
+        }
+      },
+      {
+        "id": "simulate",
+        "type": "genericNode",
+        "position": { "x": 80, "y": 280 },
+        "data": {
+          "type": "PythonFunction",
+          "node": {
+            "display_name": "Counterfactual Engine",
+            "description": "Calls backend.ai.counterfactual.simulate_counterfactual - applies changes deterministically and recomputes positions lap-by-lap.",
+            "base_classes": ["JSON"],
+            "template": {
+              "module": { "type": "str", "value": "ai.counterfactual" },
+              "function": { "type": "str", "value": "simulate_counterfactual" }
+            }
+          }
+        }
+      },
+      {
+        "id": "prompt",
+        "type": "genericNode",
+        "position": { "x": 360, "y": 280 },
+        "data": {
+          "type": "PromptTemplate",
+          "node": {
+            "display_name": "Granite Prompt",
+            "description": "Combines race name, change summary, actual + alternate top 5, and retrieved chunks. Asks for a 3-4 sentence factual explanation citing chunks by [n].",
+            "base_classes": ["Prompt"],
+            "template": {
+              "system": {
+                "type": "str",
+                "value": "You are an expert Formula 1 race analyst. Use only the facts and retrieved context provided."
+              },
+              "template": {
+                "type": "str",
+                "value": "Race: {race_name}\nChanges: {changes}\nActual top 5: {actual_top5}\nAlternate top 5: {alt_top5}\nContext:\n{context}\nExplanation:"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "granite_llm",
+        "type": "genericNode",
+        "position": { "x": 640, "y": 280 },
+        "data": {
+          "type": "WatsonxLLM",
+          "node": {
+            "display_name": "Granite-3-8b-instruct",
+            "description": "watsonx.ai text generation endpoint. temp=0.5, max_new_tokens=300.",
+            "base_classes": ["Text"],
+            "template": {
+              "model_id": { "type": "str", "value": "ibm/granite-3-8b-instruct" },
+              "max_new_tokens": { "type": "int", "value": 300 },
+              "temperature": { "type": "float", "value": 0.5 }
+            }
+          }
+        }
+      },
+      {
+        "id": "output",
+        "type": "genericNode",
+        "position": { "x": 920, "y": 180 },
+        "data": {
+          "type": "JSONOutput",
+          "node": {
+            "display_name": "Counterfactual Result",
+            "description": "Final payload returned by POST /counterfactual/simulate: alt_laps, summary, explanation, citations.",
+            "base_classes": ["JSON"],
+            "template": {
+              "shape": {
+                "type": "str",
+                "value": "{ race_id, alt_laps, changes, summary, explanation, citations, actual_top5, alt_top5 }"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": "input_race", "target": "embed_query" },
+      { "id": "e2", "source": "embed_query", "target": "pgvector_retrieve" },
+      { "id": "e3", "source": "input_race", "target": "simulate" },
+      { "id": "e4", "source": "simulate", "target": "prompt", "label": "summary, top5" },
+      { "id": "e5", "source": "pgvector_retrieve", "target": "prompt", "label": "context" },
+      { "id": "e6", "source": "prompt", "target": "granite_llm" },
+      { "id": "e7", "source": "granite_llm", "target": "output" },
+      { "id": "e8", "source": "simulate", "target": "output", "label": "alt_laps" },
+      { "id": "e9", "source": "pgvector_retrieve", "target": "output", "label": "citations" }
+    ]
+  }
 }
-
