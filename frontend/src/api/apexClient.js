@@ -2,7 +2,7 @@ import axios from "axios";
 
 export const apexClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8000",
-  timeout: 10000
+  timeout: 60000,
 });
 
 export async function fetchRaces() {
@@ -21,7 +21,10 @@ export async function fetchCircuitPath(circuitId) {
 }
 
 export async function simulateCounterfactual(raceId, changes) {
-  const response = await apexClient.post("/counterfactual/simulate", { race_id: raceId, changes });
+  const response = await apexClient.post("/counterfactual/simulate", {
+    race_id: raceId,
+    changes,
+  });
   return response.data;
 }
 
@@ -31,7 +34,11 @@ export async function fetchForecast(raceId) {
 }
 
 export async function saveScenario(label, raceId, changes) {
-  const response = await apexClient.post("/scenarios", { label, race_id: raceId, changes });
+  const response = await apexClient.post("/scenarios", {
+    label,
+    race_id: raceId,
+    changes,
+  });
   return response.data;
 }
 
@@ -42,5 +49,28 @@ export async function fetchScenarios() {
 
 export async function fetchLapTelemetry(raceId, lap) {
   const response = await apexClient.get(`/races/${raceId}/telemetry/${lap}`);
+  return response.data;
+}
+
+export async function solveGloryPath(raceId, driverCode, targetPosition) {
+  const response = await apexClient.post("/glory-path/solve", {
+    race_id: raceId,
+    driver_code: driverCode,
+    target_position: targetPosition,
+  });
+  return response.data;
+}
+
+export async function fetchCommentary(raceId, upToLap) {
+  const params = upToLap ? { up_to_lap: upToLap } : {};
+  const response = await apexClient.get(`/ai/commentary/${raceId}`, { params });
+  return response.data;
+}
+
+export async function askAI(raceId, question) {
+  const response = await apexClient.post("/ai/ask", {
+    race_id: raceId,
+    question,
+  });
   return response.data;
 }

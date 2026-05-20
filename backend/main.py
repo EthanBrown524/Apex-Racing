@@ -6,7 +6,15 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api import circuits, counterfactual, forecast, races, scenarios
+from api import (
+    circuits,
+    commentary,
+    counterfactual,
+    forecast,
+    glory_path,
+    races,
+    scenarios,
+)
 from db.connection import dispose_engine
 
 
@@ -39,6 +47,8 @@ app.include_router(circuits.router)
 app.include_router(counterfactual.router)
 app.include_router(forecast.router)
 app.include_router(scenarios.router)
+app.include_router(glory_path.router)
+app.include_router(commentary.router)
 
 
 @app.get("/")

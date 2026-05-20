@@ -1,6 +1,9 @@
 import { NavLink, Route, Routes } from "react-router-dom";
 
+import AboutPage from "./pages/AboutPage.jsx";
 import ForecastPage from "./pages/ForecastPage.jsx";
+import GloryPathPage from "./pages/GloryPathPage.jsx";
+import LibraryPage from "./pages/LibraryPage.jsx";
 import RewindPage from "./pages/RewindPage.jsx";
 
 export default function App() {
@@ -9,17 +12,29 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <span className="brand-badge">APEX</span>
-          <span className="brand-name">Racing Records</span>
+          <span className="brand-name">
+            <strong>Race Director</strong>
+            <span className="brand-sub">F1 alternate-history simulator</span>
+          </span>
         </div>
         <nav className="topnav" aria-label="Primary">
-          <NavLink to="/" end>Race Rewind</NavLink>
+          <NavLink to="/" end>Library</NavLink>
+          <NavLink to="/rewind">Time Machine</NavLink>
+          <NavLink to="/glory">Glory Path</NavLink>
           <NavLink to="/forecast">Forecast</NavLink>
+          <NavLink to="/about">About</NavLink>
         </nav>
       </header>
 
       <Routes>
-        <Route path="/" element={<RewindPage />} />
+        <Route path="/" element={<LibraryPage />} />
+        <Route path="/rewind" element={<RewindPage />} />
+        <Route path="/rewind/:raceId" element={<RewindPage />} />
+        <Route path="/glory" element={<GloryPathPage />} />
+        <Route path="/glory/:raceId" element={<GloryPathPage />} />
         <Route path="/forecast" element={<ForecastPage />} />
+        <Route path="/forecast/:raceId" element={<ForecastPage />} />
+        <Route path="/about" element={<AboutPage />} />
       </Routes>
     </div>
   );

@@ -1,0 +1,154 @@
+{
+  "name": "APEX Glory Path",
+  "description": "Given a race + driver + target finish, search for the smallest set of counterfactual changes that lifts the driver to the target. Uses the counterfactual engine as a black box and Granite for narrative reasoning.",
+  "is_component": false,
+  "tags": ["apex", "f1", "watsonx", "granite", "search", "optimization"],
+  "data": {
+    "viewport": { "x": 0, "y": 0, "zoom": 0.95 },
+    "nodes": [
+      {
+        "id": "input_glory",
+        "type": "genericNode",
+        "position": { "x": 80, "y": 100 },
+        "data": {
+          "type": "TextInput",
+          "node": {
+            "display_name": "Glory Request",
+            "description": "{ race_id, driver_code, target_position }",
+            "base_classes": ["Text"],
+            "template": {
+              "value": {
+                "type": "str",
+                "value": "{ \"race_id\": 12, \"driver_code\": \"HAM\", \"target_position\": 1 }"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "candidates",
+        "type": "genericNode",
+        "position": { "x": 360, "y": 100 },
+        "data": {
+          "type": "PythonFunction",
+          "node": {
+            "display_name": "Candidate Surfacer",
+            "description": "Ranks plausible interventions: slow pit stops to move, ahead drivers to retire, slow stint laps to rewrite. Returns ordered by expected position gain.",
+            "base_classes": ["List"],
+            "template": {
+              "module": { "type": "str", "value": "ai.glory_path" },
+              "function": { "type": "str", "value": "_candidate_changes" }
+            }
+          }
+        }
+      },
+      {
+        "id": "greedy_loop",
+        "type": "genericNode",
+        "position": { "x": 640, "y": 100 },
+        "data": {
+          "type": "LoopController",
+          "node": {
+            "display_name": "Greedy Apply Loop",
+            "description": "While target not reached AND applied < MAX_CHANGES AND no_gain_streak < 2: take next candidate, simulate, accept if it gains a position.",
+            "base_classes": ["List"],
+            "template": {
+              "max_iterations": { "type": "int", "value": 4 },
+              "min_gain_to_continue": { "type": "int", "value": 1 }
+            }
+          }
+        }
+      },
+      {
+        "id": "simulate_step",
+        "type": "genericNode",
+        "position": { "x": 640, "y": 280 },
+        "data": {
+          "type": "PythonFunction",
+          "node": {
+            "display_name": "Counterfactual Engine",
+            "description": "Re-runs simulate_counterfactual for each candidate set. Same module as What-If Lab.",
+            "base_classes": ["JSON"],
+            "template": {
+              "module": { "type": "str", "value": "ai.counterfactual" },
+              "function": { "type": "str", "value": "simulate_counterfactual" }
+            }
+          }
+        }
+      },
+      {
+        "id": "rag",
+        "type": "genericNode",
+        "position": { "x": 360, "y": 280 },
+        "data": {
+          "type": "PGVectorRetriever",
+          "node": {
+            "display_name": "RAG Context",
+            "description": "Pulls top-6 race narrative chunks for the storyline prompt.",
+            "base_classes": ["Documents"],
+            "template": {
+              "query_template": {
+                "type": "str",
+                "value": "{driver_code} race story strategy mistakes safety car incidents"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "storyline_prompt",
+        "type": "genericNode",
+        "position": { "x": 920, "y": 200 },
+        "data": {
+          "type": "PromptTemplate",
+          "node": {
+            "display_name": "Storyline Prompt",
+            "description": "Builds the 3-5 sentence alternate-history narration with [n] citations.",
+            "base_classes": ["Prompt"]
+          }
+        }
+      },
+      {
+        "id": "granite",
+        "type": "genericNode",
+        "position": { "x": 1200, "y": 200 },
+        "data": {
+          "type": "WatsonxLLM",
+          "node": {
+            "display_name": "Granite-3-8b-instruct",
+            "base_classes": ["Text"],
+            "template": {
+              "model_id": { "type": "str", "value": "ibm/granite-3-8b-instruct" },
+              "max_new_tokens": { "type": "int", "value": 350 },
+              "temperature": { "type": "float", "value": 0.55 }
+            }
+          }
+        }
+      },
+      {
+        "id": "output",
+        "type": "genericNode",
+        "position": { "x": 1480, "y": 200 },
+        "data": {
+          "type": "JSONOutput",
+          "node": {
+            "display_name": "Glory Path Result",
+            "description": "{ starting_position, achieved_position, applied[], rationales[], explanation, citations }",
+            "base_classes": ["JSON"]
+          }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": "input_glory", "target": "candidates" },
+      { "id": "e2", "source": "candidates", "target": "greedy_loop" },
+      { "id": "e3", "source": "greedy_loop", "target": "simulate_step", "label": "trial set" },
+      { "id": "e4", "source": "simulate_step", "target": "greedy_loop", "label": "accepted/rejected" },
+      { "id": "e5", "source": "input_glory", "target": "rag" },
+      { "id": "e6", "source": "rag", "target": "storyline_prompt" },
+      { "id": "e7", "source": "greedy_loop", "target": "storyline_prompt", "label": "applied changes" },
+      { "id": "e8", "source": "storyline_prompt", "target": "granite" },
+      { "id": "e9", "source": "granite", "target": "output" }
+    ]
+  }
+}
