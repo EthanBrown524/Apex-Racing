@@ -7,13 +7,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api import (
+    championship,
     circuits,
     commentary,
     counterfactual,
     forecast,
     glory_path,
+    health,
     races,
     scenarios,
+    showcase,
 )
 from db.connection import dispose_engine
 
@@ -49,6 +52,9 @@ app.include_router(forecast.router)
 app.include_router(scenarios.router)
 app.include_router(glory_path.router)
 app.include_router(commentary.router)
+app.include_router(championship.router)
+app.include_router(showcase.router)
+app.include_router(health.router)
 
 
 @app.get("/")

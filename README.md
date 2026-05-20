@@ -3,24 +3,26 @@
 **An AI-powered Formula 1 alternate-history simulator.**
 Built on the IBM watsonx + Granite stack for the IBM May 2026 hackathon.
 
-APEX turns every Grand Prix from **2019-2024** into an editable timeline. Replay
-any race with telemetry-driven car positions and AI commentary, rewrite the
-strategy in the What-If Lab, or ask **Glory Path** to find the smallest set of
-changes that gets your favourite driver to P1.
+APEX turns every Grand Prix from **2019-2024** into an editable timeline.
+Replay any race with telemetry-driven cars and Granite-narrated commentary,
+rewrite the strategy in the What-If Lab, watch the **season championship flip
+in real time**, or ask **Glory Path** to find the smallest set of changes that
+gets your favourite driver to P1.
 
 ## Modes
 
 | Mode | What it does |
 |------|--------------|
 | **Library** | Browse every race 2019-2024 grouped by season. |
-| **Time Machine** | Replay a race with telemetry, live leaderboard, Granite-narrated commentary, and free-form "Ask APEX" Q&A. |
-| **What-If Lab** | Apply pit, DNF, weather, safety-car, mechanical, grid-swap, or fastest-lap changes; Granite explains the new outcome with citations. |
-| **Glory Path** | Pick a driver + target finish. The greedy optimizer finds minimum interventions and Granite narrates the alternate storyline. |
+| **Showcase** | One-click curated demos: Abu Dhabi 2021, Monaco 2022, Singapore 2023 in the wet, Glory Path for Alonso, and more. Each card pre-loads its changes. |
+| **Time Machine** | Replay a race with telemetry, live leaderboard, lap-by-lap Granite commentary, free-form "Ask APEX" Q&A, and keyboard shortcuts. |
+| **What-If Lab** | Apply pit / DNF / weather / safety-car / mechanical / grid-swap / fastest-lap changes; Granite explains with citations; **Realism Score** chip rates plausibility; **Championship Impact** card recomputes the season standings. |
+| **Glory Path** | Pick a driver + target finish. Greedy optimizer finds the minimum interventions; Granite narrates; animated `P-start -> P-achieved` hero. |
 | **Forecast** | Win-probability bars + circuit-DNA radar derived from historical aggregates. |
 
 ## IBM stack
 
-- **Granite-3-8b-instruct** (watsonx.ai) - explanations, narration, Q&A, storylines.
+- **Granite-3-8b-instruct** (watsonx.ai) - explanations, narration, Q&A, storylines, realism scoring.
 - **Slate-30m-english-rtrvr** (watsonx.ai embeddings) - RAG over race narratives + FIA stewards' decisions.
 - **Docling** - FIA PDF -> structured markdown -> RAG chunks.
 - **Langflow** - exportable visual graphs of the counterfactual, glory-path, and forecast pipelines (`langflow/*.json`).
@@ -35,15 +37,20 @@ React (Vite) <--> FastAPI <--> PostgreSQL + pgvector
                       +--> FastF1 / Ergast (ingestion)
 ```
 
-Full breakdown in [`docs/APEX_Technical_Document_v2.md`](docs/APEX_Technical_Document_v2.md).
-Continuation roadmap in [`docs/ROADMAP_FOR_CLAUDE.md`](docs/ROADMAP_FOR_CLAUDE.md).
+10 FastAPI routers, 11 AI modules, 18 smoke tests, ~3300 lines of code.
 
-## Setup
+## Docs
+
+| Doc | Purpose |
+|-----|---------|
+| [`docs/APEX_Technical_Document_v2.md`](docs/APEX_Technical_Document_v2.md) | Full technical spec (architecture, data model, IBM stack, API contract, performance notes, demo script, tests). |
+| [`docs/SETUP_AND_INGEST.md`](docs/SETUP_AND_INGEST.md) | Step-by-step setup + 2019-2024 ingestion runbook. |
+| [`docs/ROADMAP_FOR_CLAUDE.md`](docs/ROADMAP_FOR_CLAUDE.md) | Tasks for follow-on agents with files, instructions, and acceptance checks. |
+
+## Setup (TL;DR)
 
 ```bash
 cp .env.example .env
-# Edit .env: IBM_API_KEY, WATSONX_PROJECT_ID are optional - everything still
-# runs without them (Granite paths return a deterministic fallback).
 
 # Backend
 cd backend
@@ -53,7 +60,7 @@ pip install -r requirements.txt
 alembic upgrade head
 uvicorn main:app --reload --port 8000
 
-# Frontend (in a second terminal)
+# Frontend (second terminal)
 cd frontend
 npm install
 npm run dev
@@ -63,22 +70,23 @@ npm run dev
 
 ```bash
 cd backend
-python -m ingestion.run_bulk --years 2019 2020 2021 2022 2023 2024
+python -m ingestion.run_bulk --years 2019 2020 2021 2022 2023 2024 --skip-telemetry --skip-embeddings
 python -m ingestion.embed_races --years 2019 2020 2021 2022 2023 2024
 ```
 
-The pipeline is restart-safe. Skip slow phases with `--skip-telemetry` or `--skip-embeddings`.
+The pipeline is restart-safe. See [`docs/SETUP_AND_INGEST.md`](docs/SETUP_AND_INGEST.md) for the full runbook.
 
-## FIA stewards' decisions
+## Run the tests
 
-Drop PDFs in `backend/fia_pdfs/` and run:
 ```bash
-python -m ingestion.fia_parser backend/fia_pdfs/
+cd backend
+pytest tests/ -v
 ```
 
-Each PDF becomes RAG-retrievable; citations appear in the UI as `[n] fia_decision` chips.
+18 smoke tests; no Postgres or IBM credentials required.
 
-## API
+## Live diagnostics
 
-Documented in section 8 of [`docs/APEX_Technical_Document_v2.md`](docs/APEX_Technical_Document_v2.md).
-The OpenAPI auto-docs are at `http://localhost:8000/docs` when the backend is running.
+`GET /health` returns row counts, season coverage, pgvector status, and
+Granite credential status. The footer in the UI surfaces these as live
+chips so judges can see what's wired at a glance.

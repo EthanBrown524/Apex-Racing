@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { SkeletonCard, SkeletonList } from "../components/Skeleton/Skeleton.jsx";
 import { fetchRaces } from "../api/apexClient.js";
 import { sampleRaces } from "../data/sampleData.js";
 
@@ -39,10 +40,11 @@ export default function LibraryPage() {
     const q = query.trim().toLowerCase();
     return races
       .filter((r) => r.season === year)
-      .filter((r) =>
-        !q ||
-        (r.name && r.name.toLowerCase().includes(q)) ||
-        (r.circuit_name && r.circuit_name.toLowerCase().includes(q))
+      .filter(
+        (r) =>
+          !q ||
+          (r.name && r.name.toLowerCase().includes(q)) ||
+          (r.circuit_name && r.circuit_name.toLowerCase().includes(q))
       )
       .sort((a, b) => (a.round ?? 0) - (b.round ?? 0));
   }, [races, year, query]);
@@ -79,7 +81,11 @@ export default function LibraryPage() {
         <span className="meta-pill">Source <strong>{status}</strong></span>
       </div>
 
-      {visible.length === 0 ? (
+      {status === "loading" ? (
+        <div className="race-grid">
+          <SkeletonList rows={8} Component={SkeletonCard} />
+        </div>
+      ) : visible.length === 0 ? (
         <div className="empty">
           No races for {year}. Run <code>python -m ingestion.run_bulk --years {year}</code> to ingest them.
         </div>

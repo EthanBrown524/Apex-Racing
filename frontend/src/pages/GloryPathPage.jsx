@@ -1,17 +1,55 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 
 import Citations from "../components/Citations/Citations.jsx";
 import { fetchRaces } from "../api/apexClient.js";
 import { sampleRaces } from "../data/sampleData.js";
 import { useGloryPath } from "../hooks/useGloryPath.js";
 
+function useCountdown(target, ms = 700) {
+  const [value, setValue] = useState(target);
+  useEffect(() => {
+    if (target == null) {
+      setValue(target);
+      return;
+    }
+    setValue(target);
+  }, [target]);
+  return value;
+}
+
+function AnimatedPosition({ from, to }) {
+  const [shown, setShown] = useState(from ?? to);
+
+  useEffect(() => {
+    if (from == null || to == null || from === to) {
+      setShown(to);
+      return;
+    }
+    setShown(from);
+    const step = from > to ? -1 : 1;
+    const totalSteps = Math.abs(to - from);
+    const delay = Math.max(60, Math.min(120, 700 / Math.max(totalSteps, 1)));
+    let current = from;
+    const id = setInterval(() => {
+      current += step;
+      setShown(current);
+      if (current === to) clearInterval(id);
+    }, delay);
+    return () => clearInterval(id);
+  }, [from, to]);
+
+  return <span>{shown != null ? `P${shown}` : "-"}</span>;
+}
+
 export default function GloryPathPage() {
   const { raceId: paramRaceId } = useParams();
+  const location = useLocation();
   const [races, setRaces] = useState([]);
   const [raceId, setRaceId] = useState(paramRaceId ? Number(paramRaceId) : null);
-  const [driverCode, setDriverCode] = useState("HAM");
-  const [targetPosition, setTargetPosition] = useState(1);
+  const scenario = location.state;
+  const [driverCode, setDriverCode] = useState(scenario?.driver_code ?? "HAM");
+  const [targetPosition, setTargetPosition] = useState(scenario?.target_position ?? 1);
   const glory = useGloryPath();
 
   useEffect(() => {
@@ -23,6 +61,14 @@ export default function GloryPathPage() {
   useEffect(() => {
     if (raceId == null && races.length) setRaceId(races[0].id);
   }, [races, raceId]);
+
+  // If we came from the Showcase with a scenario, auto-solve once we have a raceId
+  useEffect(() => {
+    if (scenario?.mode === "glory_path" && raceId) {
+      glory.solve(raceId, scenario.driver_code, scenario.target_position ?? 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raceId]);
 
   const selectedRace = useMemo(
     () => races.find((r) => r.id === Number(raceId)),
@@ -115,22 +161,22 @@ export default function GloryPathPage() {
               <div className="glory-pos">
                 <div className="label">Actually finished</div>
                 <div className="val">
-                  {glory.result.starting_position
-                    ? `P${glory.result.starting_position}`
-                    : "-"}
+                  {glory.result.starting_position ? `P${glory.result.starting_position}` : "-"}
                 </div>
               </div>
               <div className="glory-arrow">&rarr;</div>
               <div className="glory-pos target">
                 <div className="label">Glory Path</div>
                 <div className="val">
-                  {glory.result.achieved_position
-                    ? `P${glory.result.achieved_position}`
-                    : "-"}
+                  <AnimatedPosition
+                    from={glory.result.starting_position}
+                    to={glory.result.achieved_position}
+                  />
                 </div>
               </div>
               <div style={{ marginLeft: "auto", fontSize: 12, color: "var(--text-dim)" }}>
-                Target was <strong style={{ color: "var(--text)" }}>P{glory.result.target_position}</strong>
+                Target was{" "}
+                <strong style={{ color: "var(--text)" }}>P{glory.result.target_position}</strong>
               </div>
             </div>
 
@@ -178,13 +224,10 @@ export default function GloryPathPage() {
 function formatChange(c) {
   if (c.change_type === "pit_lap") return `${c.driver_code} pit moved to lap ${c.value}`;
   if (c.change_type === "dnf") return `${c.driver_code} retires on lap ${c.lap}`;
-  if (c.change_type === "fastest_lap")
-    return `${c.driver_code} sets ${c.value} ms on lap ${c.lap}`;
-  if (c.change_type === "mechanical")
-    return `${c.driver_code} mechanical from lap ${c.lap}`;
+  if (c.change_type === "fastest_lap") return `${c.driver_code} sets ${c.value} ms on lap ${c.lap}`;
+  if (c.change_type === "mechanical") return `${c.driver_code} mechanical from lap ${c.lap}`;
   if (c.change_type === "weather") return `Weather window from lap ${c.lap}`;
   if (c.change_type === "safety_car") return `Safety car at lap ${c.value ?? c.lap}`;
-  if (c.change_type === "grid_swap")
-    return `${c.driver_code} swaps grid with ${c.value}`;
+  if (c.change_type === "grid_swap") return `${c.driver_code} swaps grid with ${c.value}`;
   return `${c.driver_code} ${c.change_type}`;
 }

@@ -28,6 +28,22 @@ export async function simulateCounterfactual(raceId, changes) {
   return response.data;
 }
 
+export async function fetchRealism(raceId, changes) {
+  const response = await apexClient.post("/counterfactual/realism", {
+    race_id: raceId,
+    changes,
+  });
+  return response.data;
+}
+
+export async function fetchChampionshipImpact(raceId, changes) {
+  const response = await apexClient.post("/championship/impact", {
+    race_id: raceId,
+    changes,
+  });
+  return response.data;
+}
+
 export async function fetchForecast(raceId) {
   const response = await apexClient.get(`/forecast/${raceId}`);
   return response.data;
@@ -72,5 +88,20 @@ export async function askAI(raceId, question) {
     race_id: raceId,
     question,
   });
+  return response.data;
+}
+
+export async function fetchShowcase() {
+  const response = await apexClient.get("/showcase");
+  return response.data;
+}
+
+export async function fetchShowcaseScenario(scenarioId) {
+  const response = await apexClient.get(`/showcase/${scenarioId}`);
+  return response.data;
+}
+
+export async function fetchHealth() {
+  const response = await apexClient.get("/health");
   return response.data;
 }

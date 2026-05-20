@@ -12,3 +12,6 @@ httpx
 pgvector
 docling
 
+# Test-only
+pytest
+

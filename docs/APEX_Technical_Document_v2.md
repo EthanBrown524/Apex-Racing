@@ -8,17 +8,19 @@
 
 ## 1. Product summary
 
-APEX turns every Grand Prix from 2019-2024 into an editable timeline. Three modes:
+APEX turns every Grand Prix from 2019-2024 into an editable timeline. Six routes:
 
 | Mode | Path | What it does |
 |------|------|--------------|
 | **Library** | `/` | Grid of every race grouped by season, click to open. |
-| **Time Machine** | `/rewind/:raceId` | Replay a race with telemetry-driven car positions, live leaderboard, AI commentary that updates lap-by-lap, and a free-form "Ask APEX" panel. |
-| **What-If Lab** | `/rewind/:raceId` (right rail) | Apply strategy changes (pit lap, DNF, weather, safety car, mechanical, grid swap, fastest lap). The deterministic simulator recomputes the standings; Granite explains the new outcome with citations. |
-| **Glory Path** | `/glory/:raceId` | Pick a driver + target finish position. APEX greedy-searches the smallest set of changes that gets them there and Granite narrates the alternate storyline. |
-| **Forecast** | `/forecast/:raceId` | Win-probability + circuit-DNA radar derived from historical aggregates. |
+| **Showcase** | `/showcase` | One-click, pre-baked demo scenarios (Abu Dhabi 2021, Monaco 2022, Brazil 2022, Singapore 2023, Glory Path: Alonso, Glory Path: Leclerc). Each card auto-loads its changes into the relevant mode. |
+| **Time Machine** | `/rewind/:raceId` | Replay a race with telemetry-driven car positions, live leaderboard, lap-by-lap AI commentary, free-form "Ask APEX", and keyboard shortcuts (Space, arrow keys, R). |
+| **What-If Lab** | `/rewind/:raceId` (right rail) | Apply strategy changes (7 types). The deterministic simulator recomputes the standings; Granite explains the new outcome with citations; **Realism Score** chip judges plausibility; **Championship Impact** card recomputes the season standings. |
+| **Glory Path** | `/glory/:raceId` | Pick a driver + target finish position. APEX greedy-searches the smallest set of changes that gets them there; Granite narrates the alternate storyline; animated position countdown shows P-start to P-achieved. |
+| **Forecast** | `/forecast/:raceId` | Win-probability bars + circuit-DNA radar derived from historical aggregates. |
+| **About** | `/about` | Stack overview, feature cards, F1-jargon glossary tooltips. |
 
-The whole UI runs against a single FastAPI service; the frontend never calls IBM endpoints directly.
+The whole UI runs against a single FastAPI service; the frontend never calls IBM endpoints directly. A `Footer` component fetches `/health` and surfaces live diagnostics (ingested race count, Granite status, pgvector status).
 
 ---
 
@@ -49,21 +51,27 @@ backend/
   api/
     races.py              GET /races, GET /races/{id}/laps, GET /races/{id}/telemetry/{lap}
     circuits.py           GET /circuits, GET /circuits/{id}/path
-    counterfactual.py     POST /counterfactual/simulate
+    counterfactual.py     POST /counterfactual/simulate, POST /counterfactual/realism
     forecast.py           GET /forecast/{race_id}
     scenarios.py          POST /scenarios, GET /scenarios
     glory_path.py         POST /glory-path/solve
     commentary.py         GET /ai/commentary/{race_id}, POST /ai/ask
+    championship.py       POST /championship/impact
+    showcase.py           GET /showcase, GET /showcase/{scenario_id}
+    health.py             GET /health (counts + Granite status + pgvector status)
   ai/
     granite.py            watsonx.ai text-generation client (55-min token cache)
     embeddings.py         watsonx.ai embedding client; hash-vector fallback when offline
     rag.py                pgvector retrieve + upsert; race_id-scoped top-k
     changes.py            shared constants + describe_change() + safe_int()
-                          (used by counterfactual and glory_path - no duplication)
     counterfactual.py     deterministic engine + Granite explanation; 7 change types
     glory_path.py         greedy search over candidate interventions
     commentary.py         narrative + free-form Q&A with RAG citations
     forecast.py           historical-form heuristic + circuit-DNA aggregation
+    championship.py       end-of-season standings recompute under counterfactual
+    realism.py            Granite-judged 0-1 score with heuristic fallback
+    showcase_scenarios.py curated demo scenarios (Abu Dhabi 2021 etc.)
+  tests/                  pytest smoke tests (18 passing) - no DB or IBM required
   ingestion/
     ergast.py             metadata + results + lap times + pit stops, paginated
     fastf1_loader.py      circuit GPS outlines from FastF1
@@ -103,11 +111,13 @@ frontend/src/
     useCommentary.js      GET /ai/commentary/{id}
     useAIChat.js          stateful conversation against POST /ai/ask
   pages/
-    LibraryPage.jsx       race grid filtered by season + search
+    LibraryPage.jsx       race grid filtered by season + search; skeleton loaders
+    ShowcasePage.jsx      curated demo cards; one-click launch with pre-filled changes
     RewindPage.jsx        TrackCanvas + Leaderboard + WhatIfPanel|AIChatBox + AINarrator
-    GloryPathPage.jsx     glory-path form + result hero + step list + citations
+                          + ChampionshipImpact + RealismChip + keyboard shortcuts
+    GloryPathPage.jsx     animated P-start->P-achieved hero + step list + citations
     ForecastPage.jsx      win % bars + circuit-DNA radar + risks
-    AboutPage.jsx         project + IBM-stack feature cards
+    AboutPage.jsx         project + IBM-stack feature cards + glossary tooltips
   components/
     TrackCanvas/          telemetry-driven car renderer (preserved from v1)
     Leaderboard/          team-coloured position list, tire compound badges
@@ -118,6 +128,12 @@ frontend/src/
     AINarrator/           Granite-narrated commentary panel
     AIChatBox/            free-form Q&A with citations
     Citations/            [n] source chips with hover preview
+    ChampionshipImpact/   season-standings recompute card with title-flip badge
+    RealismChip/          0-1 score chip with Plausible/Borderline/Stretch/Fantasy
+    Skeleton/             SkeletonRow + SkeletonCard + SkeletonList
+    Footer/               diagnostics-bound IBM-stack chip row
+    Glossary/             F1-jargon hover-tooltip term wrapper
+    KeyboardHints/        small Space/arrows/R legend under the track
 ```
 
 ---
@@ -234,6 +250,39 @@ Located in `ai/counterfactual.py`. Loads every lap-time row for the race, copies
 
 ---
 
+## 5b. Championship Impact
+
+`ai/championship.py:compute_championship_impact` recomputes end-of-season
+standings under a counterfactual race result, assuming every other race is
+unchanged.
+
+1. Pull actual `RaceResult.points` totals per driver + constructor for the season.
+2. Simulate the counterfactual at the target race; derive alternate points
+   from the alternate finishing positions using F1's 25/18/15/12/10/8/6/4/2/1
+   table.
+3. Apply the delta to the season totals.
+4. Compare leaders: if the alternate champion differs from the actual one,
+   the response carries `championship_changed: true` and the UI shows a
+   "TITLE CHANGES" badge.
+
+This is the "Hamilton would have won 2021 by 12 points" moment. The card
+also lists the top three biggest movers (`HAM +18pts, VER -25pts, ...`)
+and a one-paragraph narrative explaining the swing.
+
+## 5c. Realism Score
+
+`ai/realism.py:score_counterfactual` returns a 0..1 score + label
+(Plausible / Borderline / Stretch / Fantasy).
+
+- **Heuristic baseline**: 1.0 minus a fixed cost per change (weather and
+  safety_car are most expensive, fastest_lap and DNF are cheap).
+- **Granite refinement**: a short SCORE/REASON prompt asks Granite to rate
+  the scenario; result blended 70/30 with the heuristic. Falls back silently
+  to the heuristic when credentials are missing.
+
+The chip renders next to the Granite explanation in the What-If Lab so the
+judge sees instant credibility feedback.
+
 ## 6. Glory Path search
 
 `ai/glory_path.py:find_glory_path` performs three steps:
@@ -275,16 +324,21 @@ python -m ingestion.fia_parser /path/to/decisions_dir
 | Method | Path | Body / Query | Returns |
 |--------|------|--------------|---------|
 | GET | `/` | - | `{ status: "ok" }` |
+| GET | `/health` | - | `{ status, counts, seasons, pgvector_installed, granite_configured, embedding_sources, ingestion_complete }` |
 | GET | `/races` | - | `[{ id, name, season, round, circuit_id, circuit_name, date, total_laps }]` |
 | GET | `/races/{id}/laps` | - | `{ race_id, laps: [{ lap, drivers: [{ driver_id, code, position, gap_ms, time_ms, tire, in_pit }] }] }` |
 | GET | `/races/{id}/telemetry/{lap}` | - | `{ race_id, lap, drivers: [{ code, path: [{x,y,t_ms,speed}] }] }` |
 | GET | `/circuits` | - | `[{ id, name, location, country, has_path }]` |
 | GET | `/circuits/{id}/path` | - | `{ circuit_id, name, path: [{x,y,distance_pct,speed}] }` |
 | POST | `/counterfactual/simulate` | `{ race_id, changes: [{ driver_code, change_type, lap, value }] }` | `{ alt_laps, summary, explanation, citations, actual_top5, alt_top5 }` |
+| POST | `/counterfactual/realism` | `{ race_id, changes }` | `{ score, label, reasoning, source }` |
+| POST | `/championship/impact` | `{ race_id, changes }` | `{ season, actual_champion, alternate_champion, championship_changed, actual_standings, alternate_standings, biggest_movers, narrative }` |
 | POST | `/glory-path/solve` | `{ race_id, driver_code, target_position }` | `{ starting_position, achieved_position, applied, rationales, explanation, citations }` |
 | GET | `/ai/commentary/{id}?up_to_lap=N` | - | `{ race_id, up_to_lap, narrative, citations }` |
 | POST | `/ai/ask` | `{ race_id, question }` | `{ race_id, question, answer, citations }` |
 | GET | `/forecast/{id}` | - | `{ race_id, predictions, circuit_dna, risk_factors }` |
+| GET | `/showcase` | - | `[{ id, title, subtitle, season, round, mode, tagline, race_id, ... }]` |
+| GET | `/showcase/{id}` | - | one resolved scenario |
 | POST | `/scenarios` | `{ label, race_id, changes }` | `{ scenario_id }` |
 | GET | `/scenarios` | - | `[{ scenario_id, label, race_id, changes, created_at }]` |
 
@@ -313,10 +367,33 @@ DB_POOL_RECYCLE=1800
 
 ## 10. Demo script (2-minute pitch)
 
-1. **Library** -> click "2023 Monaco Grand Prix".
-2. **Time Machine** opens. AI narrator panel says "Through lap 12, Verstappen leads from pole..." with [1] [2] chips.
-3. Switch right rail to **What-If**: pick `HAM`, `pit_lap`, lap 32, value 28. Click Simulate.
-4. New leaderboard appears with HAM up two places; Granite explains why.
-5. Switch right rail to **Ask APEX**: type "what happened to PER?". Granite answers with citations.
-6. Navigate to **Glory Path**. Driver: `ALO`, target: P1. Click Find Glory Path. Watch the hero "P7 -> P1" with three interventions and a storyline.
-7. Wrap on **About**: show the IBM stack feature cards.
+1. **Showcase** -> click "Abu Dhabi 2021 - the title-deciding lap". (Pre-loads
+   the counterfactual into Time Machine.)
+2. The race opens with the change already staged. Hit **Simulate**.
+3. Granite explanation appears with citations and a **Realism chip** (e.g.
+   "Realism 73% Plausible").
+4. Click **Show championship impact**. Card flips with "TITLE CHANGES"
+   badge - alternate champion vs actual, biggest movers, narrative.
+5. Switch right rail to **Ask APEX**: "what happened to PER?". Granite
+   answers with [1] [2] citations.
+6. Navigate to **Glory Path**. Showcase card "Glory Path - Alonso back to the
+   top step" auto-solves; watch the animated `P7 -> P1` countdown.
+7. Wrap on **About**: hover over `undercut` and `VSC` to show the glossary
+   tooltips; point at the Footer chips for the live IBM-stack diagnostics.
+
+## 11. Tests
+
+```bash
+cd backend
+pip install -r requirements.txt
+pytest tests/ -v
+```
+
+18 smoke tests cover:
+- `safe_int`, `describe_change`, `strip_internal` (shared helpers)
+- `_apply_changes` and `_recompute_positions` against a hand-built baseline
+- Realism heuristic (no Granite required)
+- Showcase scenario schema (no DB required)
+
+None of these need Postgres or watsonx credentials - they run on a fresh
+checkout in under a second.

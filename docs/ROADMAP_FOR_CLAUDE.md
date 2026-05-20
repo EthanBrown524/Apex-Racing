@@ -1,9 +1,24 @@
 # APEX Roadmap - for cheaper Claude models to follow
 
-**Audience:** Claude Sonnet / Haiku continuing the build after this initial Opus pass.
+**Audience:** Claude Sonnet / Haiku continuing the build after the Opus passes.
 **Goal:** Each task below is intentionally narrow, with files, expected diffs, and an acceptance check that's easy to verify.
 
 Work top-to-bottom. Each task lists the **files** touched, what to **do**, and an **acceptance** check (a grep, a curl, or a UI behaviour). Don't skip the acceptance step.
+
+## What's already done (don't redo)
+
+- [x] Championship Impact endpoint + card (`backend/ai/championship.py`, `frontend/.../ChampionshipImpact/`)
+- [x] Realism Score endpoint + chip (`backend/ai/realism.py`, `frontend/.../RealismChip/`)
+- [x] Showcase page + curated scenarios (`backend/ai/showcase_scenarios.py`, `frontend/.../ShowcasePage.jsx`)
+- [x] Health/diagnostics endpoint (`backend/api/health.py`) + Footer chip surface
+- [x] Skeleton loaders (`Skeleton/Skeleton.jsx`) wired into LibraryPage
+- [x] Glory Path animated `P-start -> P-achieved` countdown
+- [x] Keyboard shortcuts on Time Machine (Space / ←→ / R)
+- [x] Glossary tooltips (`Glossary/GlossaryTerm.jsx`) used on AboutPage
+- [x] Test suite: 18 passing pytest smoke tests under `backend/tests/`
+- [x] Folder restructure: `backend/utils/` removed, `frontend/src/data/`, `frontend/src/styles/` split
+
+The remaining waves stay below.
 
 Prerequisites you can take for granted:
 - The branch `claude/analyze-project-jBgIH` already contains the architecture in `docs/APEX_Technical_Document_v2.md`.
@@ -94,21 +109,21 @@ Add a second pulse keyframe that scales the green dot from 1 -> 1.6 -> 1 every 1
 
 **Acceptance:** the green LIVE pill on the track HUD pulses.
 
-### Task 2.3 - Skeleton loaders
+### Task 2.3 - Skeleton loaders on the Leaderboard
 
-**Files:** `frontend/src/components/Leaderboard/Leaderboard.jsx`, `frontend/src/pages/LibraryPage.jsx`
+`SkeletonRow` / `SkeletonCard` already exist (`frontend/src/components/Skeleton/Skeleton.jsx`) and are wired into LibraryPage. Extend them to the Leaderboard so a lap with no drivers renders 6 `SkeletonRow`s instead of nothing.
 
-While `lap === undefined` or `races.length === 0 && status === 'loading'`, render 6 skeleton rows / 6 skeleton cards (gray rectangles with `@keyframes shimmer`). Add the `.skeleton` and `.shimmer` keyframe to `styles/base.css` (so the keyframe sits with the other animation tokens).
+**Files:** `frontend/src/components/Leaderboard/Leaderboard.jsx`
 
-**Acceptance:** with the backend down, reload `/` and see skeletons before the empty-state.
+**Acceptance:** load a race before lap data arrives; see shimmer rows.
 
-### Task 2.4 - Glory Path animation
+### Task 2.4 - Glory Path arrow animation polish
 
-**Files:** `frontend/src/pages/GloryPathPage.jsx`, `frontend/src/styles/pages.css`
+The number countdown is done (`AnimatedPosition` in `GloryPathPage.jsx`). Add a horizontal slide-in for the green `->` arrow so the visual transition feels complete.
 
-When `glory.result` arrives, animate the hero numbers `Pn -> Pm`. Use a `useEffect` that counts down `starting_position` -> `achieved_position` over 600ms (one position per ~80ms). Animate the green arrow with a horizontal slide-in.
+**Files:** `frontend/src/pages/GloryPathPage.jsx`, `frontend/src/styles/pages.css` (or extras.css)
 
-**Acceptance:** the "P7 -> P3" hero counts visibly instead of snapping.
+**Acceptance:** when a result arrives the arrow slides from left, opacity 0->1.
 
 ### Task 2.5 - Tire compound icons on PitStop
 

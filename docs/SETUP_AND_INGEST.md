@@ -282,12 +282,29 @@ Should show `race_narrative` and (if you ingested FIA PDFs) `fia_decision`.
 
 ```powershell
 curl http://localhost:8000/
+curl http://localhost:8000/health
 curl http://localhost:8000/races
 curl http://localhost:8000/forecast/1
+curl http://localhost:8000/showcase
 curl -X POST http://localhost:8000/glory-path/solve `
   -H "Content-Type: application/json" `
   -d '{\"race_id\": 1, \"driver_code\": \"HAM\", \"target_position\": 1}'
+curl -X POST http://localhost:8000/championship/impact `
+  -H "Content-Type: application/json" `
+  -d '{\"race_id\": 1, \"changes\": [{\"driver_code\": \"VER\", \"change_type\": \"dnf\", \"lap\": 10}]}'
 ```
+
+### Engine unit tests (no DB, no IBM keys)
+
+```powershell
+cd backend
+.\.venv\Scripts\activate
+pytest tests/ -v
+```
+
+Should print **18 passed**. These cover the change helpers, the
+counterfactual engine's pure logic, the realism heuristic, and the showcase
+scenario schema.
 
 ---
 
