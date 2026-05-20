@@ -25,6 +25,7 @@ export default function WhatIfPanel({ raceId, changes, setChanges, onRun, isRunn
   const [changeType, setChangeType] = useState("pit_lap");
   const [lap, setLap] = useState(14);
   const [value, setValue] = useState(20);
+  const [aiDirector, setAiDirector] = useState(true);
 
   const driverNeeded = useMemo(
     () => !["safety_car", "weather"].includes(changeType),
@@ -90,6 +91,19 @@ export default function WhatIfPanel({ raceId, changes, setChanges, onRun, isRunn
           />
         </div>
       </div>
+      <label className="director-toggle" title="Have Granite plan strategic responses for other drivers, then re-simulate.">
+        <input
+          type="checkbox"
+          checked={aiDirector}
+          onChange={(e) => setAiDirector(e.target.checked)}
+        />
+        <span className="director-toggle-label">
+          AI Race Director
+          <span className="director-toggle-sub">
+            Granite expands triggers into per-driver responses
+          </span>
+        </span>
+      </label>
       <div className="btn-row">
         <button className="button secondary" type="button" onClick={addChange}>
           + Add
@@ -97,7 +111,7 @@ export default function WhatIfPanel({ raceId, changes, setChanges, onRun, isRunn
         <button
           className="button primary"
           type="button"
-          onClick={() => onRun(raceId, changes)}
+          onClick={() => onRun(raceId, changes, aiDirector)}
           disabled={isRunning || changes.length === 0}
         >
           {isRunning ? "Simulating..." : "Simulate"}

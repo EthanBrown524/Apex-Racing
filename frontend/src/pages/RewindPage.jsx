@@ -8,6 +8,7 @@ import Citations from "../components/Citations/Citations.jsx";
 import KeyboardHints from "../components/KeyboardHints/KeyboardHints.jsx";
 import Leaderboard from "../components/Leaderboard/Leaderboard.jsx";
 import PlaybackControls from "../components/PlaybackControls/PlaybackControls.jsx";
+import RaceDirectorNotes from "../components/RaceDirectorNotes/RaceDirectorNotes.jsx";
 import RealismChip from "../components/RealismChip/RealismChip.jsx";
 import TrackCanvas from "../components/TrackCanvas/TrackCanvas.jsx";
 import WhatIfPanel from "../components/WhatIfPanel/WhatIfPanel.jsx";
@@ -98,8 +99,8 @@ export default function RewindPage() {
     if (paramRaceId) navigate(`/rewind/${id}`);
   }
 
-  function onRunCounterfactual(raceId, list) {
-    counterfactual.run(raceId, list);
+  function onRunCounterfactual(raceId, list, aiDirector = false) {
+    counterfactual.run(raceId, list, aiDirector);
     realism.load(raceId, list);
     if (showChampionship) championship.load(raceId, list);
   }
@@ -222,6 +223,10 @@ export default function RewindPage() {
                     </button>
                   </div>
                 </div>
+              )}
+
+              {counterfactual.result?.race_director && (
+                <RaceDirectorNotes data={counterfactual.result.race_director} />
               )}
             </>
           )}

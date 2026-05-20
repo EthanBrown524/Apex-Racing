@@ -21,6 +21,7 @@ class CounterfactualChange(BaseModel):
 class CounterfactualRequest(BaseModel):
     race_id: int
     changes: list[CounterfactualChange] = Field(default_factory=list)
+    ai_director: bool = False
 
 
 @router.post("/simulate")
@@ -31,6 +32,7 @@ def simulate(payload: CounterfactualRequest, db: Session = Depends(get_db)) -> d
     return simulate_counterfactual(
         race_id=payload.race_id,
         changes=[change.model_dump() for change in payload.changes],
+        ai_director=payload.ai_director,
     )
 
 

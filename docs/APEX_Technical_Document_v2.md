@@ -69,13 +69,21 @@ backend/
     embeddings.py         watsonx.ai embedding client; hash-vector fallback when offline
     rag.py                pgvector retrieve + upsert; race_id-scoped top-k
     changes.py            shared constants + describe_change() + safe_int()
-    counterfactual.py     deterministic engine + Granite explanation; 7 change types
+    counterfactual.py     deterministic engine + Granite explanation; 7 change types;
+                          accepts ai_director=True to invoke the Race Director pipeline
     glory_path.py         greedy search over candidate interventions
     commentary.py         narrative + free-form Q&A with RAG citations
     forecast.py           historical-form heuristic + circuit-DNA aggregation
     championship.py       end-of-season standings recompute under counterfactual
     realism.py            Granite-judged 0-1 score with heuristic fallback
     showcase_scenarios.py curated demo scenarios (Abu Dhabi 2021 etc.)
+    driver_profiles.py    5-axis skill ratings derived from historical results
+                          (wet_skill, tyre_management, aggression, consistency, race_pace_index)
+    race_director.py      Granite planner - emits structured JSON response decisions
+                          per driver given a trigger (weather / SC / mechanical / DNF).
+                          Schema-validates the output and gracefully degrades.
+    change_expander.py    Translates Race Director decisions (pit / retire / push /
+                          manage / stay_out) into engine-readable change records.
   tests/                  pytest smoke tests (18 passing) - no DB or IBM required
   ingestion/
     ergast.py             metadata + results + lap times + pit stops, paginated
@@ -116,6 +124,7 @@ frontend/src/
     home.css              Home + Seasons landing pages (hero, pillars, narrative beats, year cards)
     stats.css             Stats page + StatStrip
     extras.css            ChampionshipImpact, RealismChip, Showcase, Skeleton, Footer, Glossary, KeyboardHints
+    director.css          Race Director toggle + plan panel + decision list
   hooks/
     useRaceData.js        races + circuit path + lap data, with per-race cache
     useTelemetry.js       per-lap telemetry prefetch
@@ -149,6 +158,7 @@ frontend/src/
     AINarrator/           Granite-narrated commentary panel
     AIChatBox/            free-form Q&A with citations
     Citations/            [n] source chips with hover preview
+    RaceDirectorNotes/    AI Race Director plan card - trigger + decisions + rationales
     ChampionshipImpact/   season-standings recompute card with title-flip badge
     RealismChip/          0-1 score chip with Plausible/Borderline/Stretch/Fantasy
     Skeleton/             SkeletonRow + SkeletonCard + SkeletonList
@@ -296,6 +306,115 @@ This is the "Hamilton would have won 2021 by 12 points" moment. The card
 also lists the top three biggest movers (`HAM +18pts, VER -25pts, ...`)
 and a one-paragraph narrative explaining the swing.
 
+## 5d. AI Race Director (Option B)
+
+When the user enables the **Race Director** toggle in the What-If Lab, the
+counterfactual engine runs through an extra AI layer **before** the
+deterministic re-rank.
+
+### Pipeline
+
+```
+user changes  -->  driver_profiles  -->  race_director  -->  change_expander
+                                                                   |
+                                                                   v
+                                                    deterministic engine (existing)
+```
+
+1. **`ai/driver_profiles.py`** computes five ratings per driver from the
+   season-to-date history at the time of the race:
+
+   | Axis | How it's derived |
+   |------|------------------|
+   | `wet_skill` (0-1) | Average grid -> final-position delta in races with safety cars (proxy for chaos / wet) |
+   | `tyre_management` (0-1) | Inverse of average pit-stop count per race |
+   | `aggression` (0-1) | Average grid -> final-position delta across all races |
+   | `consistency` (0-1) | 1 - normalized lap-time stddev |
+   | `race_pace_index` (0.5-1.5) | Average finish position scaled (high finishers = higher index) |
+
+   All values default to 0.5 (race_pace_index 1.0) when there's no history.
+
+2. **`ai/race_director.py`** asks Granite to plan strategic responses for
+   each **trigger** in the user's change set. Triggers are the change types
+   that cause cascading reactions:
+   `weather`, `safety_car`, `mechanical`, `dnf`. Other change types
+   (pit_lap, fastest_lap, grid_swap) are passed through unchanged.
+
+   The prompt includes:
+   - The race name and trigger description
+   - All driver profiles, formatted one per line
+   - A strict JSON schema with explicit field names + valid action vocabulary
+
+   Granite returns:
+   ```json
+   {
+     "trigger_summary": "Heavy rain from lap 25 forces strategic split",
+     "narrative": "Verstappen pits to cover; Hamilton gambles on his wet pace; ...",
+     "decisions": [
+       {"driver_code": "VER", "action": "pit", "lap": 26, "confidence": 0.85,
+        "rationale": "Leading by 4s, wet skill 0.85, can afford the cover stop"},
+       {"driver_code": "HAM", "action": "stay_out", "lap": 25, "confidence": 0.7,
+        "rationale": "Elite wet skill 0.92, gambles for track position"},
+       ...
+     ]
+   }
+   ```
+
+   The response is **schema-validated**: unknown drivers, unknown actions,
+   out-of-range confidence, and missing fields are dropped. If the JSON
+   can't be parsed at all (preamble, malformed brackets, etc.), `_extract_json`
+   tolerates code fences and tries the first balanced object; if that
+   fails, the plan is empty and the engine runs on the user's original
+   changes only. **The demo never breaks**.
+
+3. **`ai/change_expander.py`** maps each accepted decision to one engine
+   change record:
+
+   | Director action | Engine change type | Notes |
+   |-----------------|--------------------|-------|
+   | `pit` | `pit_lap` | Driver pits on the decision's lap |
+   | `retire` | `dnf` | Driver retires from that lap onward |
+   | `push` | `fastest_lap` | Driver's average lap - 300ms on the decision's lap |
+   | `manage` | `mechanical` | +250 ms/lap penalty from that lap |
+   | `stay_out` | (none) | Narrative-only; no engine change |
+
+4. The deterministic engine consumes the **combined** change set
+   (`original + expanded`) and produces `alt_laps` as usual.
+
+### Response shape
+
+`POST /counterfactual/simulate` with `ai_director: true` returns the existing
+fields plus:
+
+```json
+{
+  "effective_changes": [...],   // original + Race-Director-added changes
+  "race_director": {
+    "plans": [{
+      "trigger_summary": "...",
+      "narrative": "...",
+      "decisions": [...]
+    }],
+    "expanded_changes": [...]   // public view of the added engine changes
+  }
+}
+```
+
+When `ai_director: false`, `race_director` is `null` and `effective_changes`
+equals the user's `changes`.
+
+### UI surface
+
+A new collapsible **Race Director Notes** card renders below the Granite
+explanation in the What-If Lab. Each plan shows:
+- The trigger summary
+- Granite's one-paragraph narrative
+- A numbered list of decisions, each with the driver tag, action verb, lap,
+  confidence percentage, and rationale
+
+Decisions are colour-coded by action tone: green = push, yellow = pit,
+red = retire, neutral = stay_out/manage.
+
 ## 5c. Realism Score
 
 `ai/realism.py:score_counterfactual` returns a 0..1 score + label
@@ -373,7 +492,7 @@ python -m ingestion.fia_parser /path/to/decisions_dir
 | GET | `/races/{id}/telemetry/{lap}` | - | `{ race_id, lap, drivers: [{ code, path: [{x,y,t_ms,speed}] }] }` |
 | GET | `/circuits` | - | `[{ id, name, location, country, has_path }]` |
 | GET | `/circuits/{id}/path` | - | `{ circuit_id, name, path: [{x,y,distance_pct,speed}] }` |
-| POST | `/counterfactual/simulate` | `{ race_id, changes: [{ driver_code, change_type, lap, value }] }` | `{ alt_laps, summary, explanation, citations, actual_top5, alt_top5 }` |
+| POST | `/counterfactual/simulate` | `{ race_id, changes: [...], ai_director?: bool }` | `{ alt_laps, summary, explanation, citations, actual_top5, alt_top5, effective_changes, race_director }` |
 | POST | `/counterfactual/realism` | `{ race_id, changes }` | `{ score, label, reasoning, source }` |
 | POST | `/championship/impact` | `{ race_id, changes }` | `{ season, actual_champion, alternate_champion, championship_changed, actual_standings, alternate_standings, biggest_movers, narrative }` |
 | POST | `/glory-path/solve` | `{ race_id, driver_code, target_position }` | `{ starting_position, achieved_position, applied, rationales, explanation, citations }` |
@@ -439,11 +558,16 @@ pip install -r requirements.txt
 pytest tests/ -v
 ```
 
-18 smoke tests cover:
+**48 smoke tests** cover:
 - `safe_int`, `describe_change`, `strip_internal` (shared helpers)
 - `_apply_changes` and `_recompute_positions` against a hand-built baseline
 - Realism heuristic (no Granite required)
 - Showcase scenario schema (no DB required)
+- Driver profile defaults + clamping + summary formatting
+- Race Director JSON extraction (tolerates preamble + code fences + garbage)
+- Race Director schema validation (drops unknown drivers/actions, clamps confidence, caps decision count)
+- Change expander mapping for every action type
+- Trigger-type detection (weather/SC/mech/dnf vs pit_lap/fastest_lap/grid_swap)
 
 None of these need Postgres or watsonx credentials - they run on a fresh
-checkout in under a second.
+checkout in under two seconds.

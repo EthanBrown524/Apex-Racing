@@ -63,13 +63,26 @@ testFork/
       changes.py                  shared describe_change(), safe_int(), strip_internal()
                                   + change-type constants. NEVER duplicate these.
       counterfactual.py           deterministic engine + Granite explanation. Pre-indexes
-                                  laps in _recompute_positions for O(N+M).
+                                  laps in _recompute_positions for O(N+M). Takes an
+                                  optional ai_director=True flag that invokes the Race
+                                  Director pipeline before the engine runs.
       glory_path.py               greedy search over candidate interventions
       commentary.py               narrate_race + answer_question
       forecast.py                 historical-form heuristic + circuit-DNA aggregation
       championship.py             end-of-season standings recompute under counterfactual
       realism.py                  Granite-judged 0..1 score with heuristic fallback
       showcase_scenarios.py       6 curated demo scenarios (Abu Dhabi 2021 etc.)
+      driver_profiles.py          5-axis skill ratings per driver derived from history.
+                                  build_profiles_for_race(race_id) -> {code: {...}}.
+                                  Defaults to 0.5 across the board when no history.
+      race_director.py            Granite planner. Takes triggers (weather, safety_car,
+                                  mechanical, dnf) + driver profiles, returns validated
+                                  JSON of strategic decisions. JSON extraction tolerates
+                                  preamble, code fences, garbage; schema validation
+                                  drops unknown drivers/actions, clamps confidence.
+      change_expander.py          Maps Race Director decisions (pit/retire/push/manage/
+                                  stay_out) to engine change records (pit_lap, dnf,
+                                  fastest_lap, mechanical).
     ingestion/                    CLI scripts run with `python -m ingestion.<name>`
       ergast.py                   metadata + results + lap times + pit stops, paginated
       fastf1_loader.py            circuit GPS outlines from FastF1
@@ -84,7 +97,7 @@ testFork/
       connection.py               SQLAlchemy engine + SessionLocal + get_db()
       models.py                   11 ORM models; pgvector Vector(1536) for embeddings
       migrations/                 Alembic (do NOT touch manually)
-    tests/                        18 pytest smoke tests. No DB or IBM keys required.
+    tests/                        48 pytest smoke tests. No DB or IBM keys required.
 
   frontend/
     package.json                  react 18, vite, axios, recharts, react-router-dom
@@ -195,7 +208,7 @@ Unique constraints:
 | GET | `/races/{id}/telemetry/{lap}` | per-driver x/y/t_ms/speed paths |
 | GET | `/circuits` | id, name, country, has_path |
 | GET | `/circuits/{id}/path` | normalized GPS path |
-| POST | `/counterfactual/simulate` | alt_laps, summary, explanation, citations, top5s |
+| POST | `/counterfactual/simulate` | alt_laps, summary, explanation, citations, top5s, race_director, effective_changes |
 | POST | `/counterfactual/realism` | { score, label, reasoning, source } |
 | POST | `/glory-path/solve` | starting_position, achieved_position, applied, rationales, explanation, citations |
 | POST | `/championship/impact` | season standings actual vs alternate + title change + narrative |
@@ -206,6 +219,34 @@ Unique constraints:
 | POST | `/scenarios`, GET `/scenarios` | save/list user scenarios |
 
 ---
+
+## 4b. AI Race Director (Option B - shipped)
+
+When `POST /counterfactual/simulate` is called with `ai_director: true`,
+the engine runs through an extra AI layer **before** the deterministic
+re-rank.
+
+**Pipeline:** `user changes -> driver_profiles -> race_director -> change_expander -> engine`
+
+- **Triggers** that invoke the Director: `weather`, `safety_car`,
+  `mechanical`, `dnf`. Other change types pass through.
+- **Driver profiles** (5 axes per driver) feed into the Granite prompt so it
+  can reason about who would do what.
+- **Granite output** is structured JSON. The `race_director` module
+  schema-validates it: unknown drivers/actions/oversized confidence are
+  dropped, malformed JSON falls back to an empty plan, and the engine runs
+  on the user's original changes only.
+- **Action vocabulary** Granite can pick from: `pit / stay_out / retire /
+  push / manage`. `change_expander` maps these to engine change types.
+
+Response payload gains:
+```
+race_director: { plans: [{trigger_summary, narrative, decisions[...]}], expanded_changes: [...] }
+effective_changes: [...]   # original + Director-added
+```
+
+The UI renders this as a **Race Director Notes** card below the Granite
+explanation, colour-coding decisions by action tone.
 
 ## 5. The 7 counterfactual change types
 
@@ -286,6 +327,7 @@ If you add a new change type:
 | A new FastAPI router | `backend/api/<name>.py`, register in `backend/main.py` |
 | Granite/RAG logic | `backend/ai/<name>.py` |
 | A new change type helper | extend `backend/ai/changes.py` - never duplicate |
+| A new Race Director action verb | add to `VALID_ACTIONS` in `race_director.py` AND to the mapper in `change_expander.py:expand_decision`. Both files or neither. |
 | An ingestion script | `backend/ingestion/<name>.py`; private helpers `_name.py` |
 | A SQLAlchemy column or table | `backend/db/models.py` + new Alembic revision |
 | A pytest | `backend/tests/test_<name>.py` (no DB unless you mock the session) |
@@ -310,7 +352,7 @@ for root, _, files in os.walk('.'):
             ast.parse(open(os.path.join(root, f)).read())
 print('OK')"
 
-pytest tests/ -v       # must show 18+ passed
+pytest tests/ -v       # must show 48+ passed
 
 # Frontend
 cd frontend

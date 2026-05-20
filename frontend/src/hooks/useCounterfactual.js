@@ -6,10 +6,10 @@ export function useCounterfactual() {
   const [result, setResult] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
 
-  const run = useCallback(async (raceId, changes) => {
+  const run = useCallback(async (raceId, changes, aiDirector = false) => {
     setIsRunning(true);
     try {
-      const data = await simulateCounterfactual(raceId, changes);
+      const data = await simulateCounterfactual(raceId, changes, aiDirector);
       setResult(data);
       return data;
     } catch {
@@ -17,6 +17,7 @@ export function useCounterfactual() {
         alt_laps: [],
         explanation: "Counterfactual API is not running yet.",
         changes,
+        race_director: null,
       };
       setResult(fallback);
       return fallback;

@@ -20,10 +20,11 @@ export async function fetchCircuitPath(circuitId) {
   return response.data;
 }
 
-export async function simulateCounterfactual(raceId, changes) {
+export async function simulateCounterfactual(raceId, changes, aiDirector = false) {
   const response = await apexClient.post("/counterfactual/simulate", {
     race_id: raceId,
     changes,
+    ai_director: aiDirector,
   });
   return response.data;
 }

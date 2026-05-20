@@ -26,6 +26,7 @@ Work top-to-bottom. Each task lists the **files** touched, what to **do**, and a
 - [x] Site IA: dedicated Home (`/`) landing page + Seasons (`/seasons`) year-selection grid + year-scoped Library (`/seasons/:year`)
 - [x] Marketing-style sections on Home: hero, scale strip, three pillars, "AI in F1" narrative beats, featured scenarios, IBM stack cards
 - [x] `frontend/src/data/seasons.js` with champion / tagline / narrative / iconic-moment per season
+- [x] AI Race Director (Option B): `driver_profiles.py` + `race_director.py` + `change_expander.py` + ai_director flag on /counterfactual/simulate + Race Director Notes UI card + 30 new tests (48 total)
 
 The remaining waves stay below.
 

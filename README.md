@@ -18,7 +18,7 @@ gets your favourite driver to P1.
 | **Library** | Race grid filtered by year + free-text search. Scoped by `/seasons/:year`. |
 | **Showcase** | One-click curated demos: Abu Dhabi 2021, Monaco 2022, Singapore 2023 in the wet, Glory Path for Alonso, and more. Each card pre-loads its changes. |
 | **Time Machine** | Replay a race with telemetry, live leaderboard, lap-by-lap Granite commentary, free-form "Ask APEX" Q&A, and keyboard shortcuts. |
-| **What-If Lab** | Apply pit / DNF / weather / safety-car / mechanical / grid-swap / fastest-lap changes; Granite explains with citations; **Realism Score** chip rates plausibility; **Championship Impact** card recomputes the season standings. |
+| **What-If Lab** | Apply pit / DNF / weather / safety-car / mechanical / grid-swap / fastest-lap changes. Toggle **AI Race Director** to have Granite plan per-driver strategic responses to your trigger (e.g. who pits when it rains, who gambles, who retires). Granite explains the outcome with citations; **Realism Score** chip rates plausibility; **Championship Impact** card recomputes the season standings. |
 | **Glory Path** | Pick a driver + target finish. Greedy optimizer finds the minimum interventions; Granite narrates; animated `P-start -> P-achieved` hero. |
 | **Forecast** | Win-probability bars + circuit-DNA radar derived from historical aggregates. |
 | **Stats** | Scale showcase - animated big numbers (Grand Prix, laps, pit stops, telemetry points, RAG chunks) + per-season progress bars. |
@@ -40,7 +40,7 @@ React (Vite) <--> FastAPI <--> PostgreSQL + pgvector
                       +--> FastF1 / Ergast (ingestion)
 ```
 
-10 FastAPI routers, 11 AI modules, 18 smoke tests, ~3300 lines of code.
+10 FastAPI routers, 14 AI modules, 48 pytest smoke tests, ~4500 lines of code.
 
 ## Docs
 

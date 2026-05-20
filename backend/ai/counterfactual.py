@@ -288,18 +288,68 @@ def _get_top5(laps: list[dict]) -> list[str]:
     return [d["code"] for d in sorted_drivers[:5]]
 
 
-def simulate_counterfactual(race_id: int, changes: list[dict]) -> dict:
+def _baseline_lap_times_by_code(baseline: dict) -> dict[str, int]:
+    """Per-driver average lap time, used by the change expander to compute
+    plausible `push` targets."""
+    out: dict[str, int] = {}
+    drivers_by_id = baseline["drivers_by_id"]
+    for driver_id, laps in baseline["laps_by_driver"].items():
+        code = drivers_by_id.get(driver_id)
+        if not code:
+            continue
+        times = [lap["time_ms"] for lap in laps if lap.get("time_ms") is not None]
+        if not times:
+            continue
+        out[code] = int(sum(times) / len(times))
+    return out
+
+
+def _public_changes(changes: list[dict]) -> list[dict]:
+    """Drop internal underscore-prefixed fields for the API response."""
+    return [
+        {k: v for k, v in c.items() if not k.startswith("_")}
+        for c in changes
+    ]
+
+
+def simulate_counterfactual(
+    race_id: int,
+    changes: list[dict],
+    ai_director: bool = False,
+) -> dict:
     db = SessionLocal()
     try:
         baseline = _load_baseline(db, race_id)
-        modified_laps = _apply_changes(baseline, changes)
+
+        race_director_plans: list[dict] = []
+        expanded_changes: list[dict] = []
+        effective_changes = list(changes)
+
+        if ai_director and changes:
+            try:
+                from ai.race_director import plan_for_changes
+                from ai.change_expander import expand_plans
+
+                race_name = baseline["race"].name or f"Race {race_id}"
+                race_director_plans = plan_for_changes(race_id, race_name, changes)
+                lap_baseline = _baseline_lap_times_by_code(baseline)
+                expanded_changes = expand_plans(
+                    race_director_plans, baseline_laps_by_code=lap_baseline
+                )
+                effective_changes = list(changes) + expanded_changes
+            except Exception:
+                race_director_plans = []
+                expanded_changes = []
+                effective_changes = list(changes)
+
+        modified_laps = _apply_changes(baseline, effective_changes)
         alt_laps = _recompute_positions(
             modified_laps,
             baseline["drivers_by_id"],
             baseline["race"].total_laps or 0,
         )
 
-        change_summary = [describe_change(c) for c in changes]
+        change_summary = [describe_change(c) for c in effective_changes]
 
         actual_final_positions = {}
         for driver_id, laps in baseline["laps_by_driver"].items():
@@ -337,15 +387,31 @@ def simulate_counterfactual(race_id: int, changes: list[dict]) -> dict:
                 f"Simulation complete. Granite explanation unavailable: {granite_err}"
             )
 
+        rd_payload = None
+        if ai_director:
+            rd_payload = {
+                "plans": [
+                    {
+                        "trigger_summary": p.get("trigger_summary", ""),
+                        "narrative": p.get("narrative", ""),
+                        "decisions": p.get("decisions", []),
+                    }
+                    for p in race_director_plans
+                ],
+                "expanded_changes": _public_changes(expanded_changes),
+            }
+
         return {
             "race_id": race_id,
             "alt_laps": alt_laps,
             "changes": changes,
+            "effective_changes": _public_changes(effective_changes),
             "summary": change_summary,
             "explanation": explanation,
             "citations": rag["citations"],
             "actual_top5": actual_top5,
             "alt_top5": alt_top5,
+            "race_director": rd_payload,
         }
 
     except ValueError as exc:
@@ -353,11 +419,13 @@ def simulate_counterfactual(race_id: int, changes: list[dict]) -> dict:
             "race_id": race_id,
             "alt_laps": [],
             "changes": changes,
+            "effective_changes": [],
             "summary": [],
             "explanation": str(exc),
             "citations": [],
             "actual_top5": [],
             "alt_top5": [],
+            "race_director": None,
         }
     finally:
         db.close()
