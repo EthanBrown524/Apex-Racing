@@ -11,9 +11,11 @@ gets your favourite driver to P1.
 
 ## Modes
 
-| Mode | What it does |
+| Page | What it does |
 |------|--------------|
-| **Library** | Browse every race 2019-2024 grouped by season. |
+| **Home** | Landing page - hero, scale strip, three pillars, AI-in-F1 narrative, featured demo scenarios, IBM stack cards. |
+| **Seasons** | Six rich year cards (2019-2024) - champion, tagline, narrative, iconic moment, ingestion progress bar. Primary year-selection surface. |
+| **Library** | Race grid filtered by year + free-text search. Scoped by `/seasons/:year`. |
 | **Showcase** | One-click curated demos: Abu Dhabi 2021, Monaco 2022, Singapore 2023 in the wet, Glory Path for Alonso, and more. Each card pre-loads its changes. |
 | **Time Machine** | Replay a race with telemetry, live leaderboard, lap-by-lap Granite commentary, free-form "Ask APEX" Q&A, and keyboard shortcuts. |
 | **What-If Lab** | Apply pit / DNF / weather / safety-car / mechanical / grid-swap / fastest-lap changes; Granite explains with citations; **Realism Score** chip rates plausibility; **Championship Impact** card recomputes the season standings. |

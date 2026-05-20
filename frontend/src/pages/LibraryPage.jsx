@@ -1,21 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { SkeletonCard, SkeletonList } from "../components/Skeleton/Skeleton.jsx";
 import { StatStrip } from "../components/StatHero/StatHero.jsx";
 import { fetchRaces } from "../api/apexClient.js";
 import { sampleRaces } from "../data/sampleData.js";
+import { findSeason } from "../data/seasons.js";
 import { useStats } from "../hooks/useStats.js";
 
 const YEARS = [2024, 2023, 2022, 2021, 2020, 2019];
 
 export default function LibraryPage() {
+  const { year: yearParam } = useParams();
+  const initialYear = yearParam ? Number(yearParam) : YEARS[0];
+
   const [races, setRaces] = useState([]);
   const [status, setStatus] = useState("loading");
-  const [year, setYear] = useState(YEARS[0]);
+  const [year, setYear] = useState(initialYear);
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
   const { data: stats } = useStats();
+
+  const scoped = Boolean(yearParam);
+  const season = scoped ? findSeason(year) : null;
+
+  useEffect(() => {
+    if (yearParam) setYear(Number(yearParam));
+  }, [yearParam]);
 
   useEffect(() => {
     fetchRaces()
@@ -52,16 +63,34 @@ export default function LibraryPage() {
       .sort((a, b) => (a.round ?? 0) - (b.round ?? 0));
   }, [races, year, query]);
 
+  function changeYear(y) {
+    setYear(y);
+    if (scoped) navigate(`/seasons/${y}`);
+  }
+
   return (
     <div className="library-shell">
       <div className="hero">
-        <div className="hero-eyebrow">RACE LIBRARY</div>
-        <div className="hero-title">Rewrite the past, race by race.</div>
-        <p className="hero-sub">
-          Browse every Grand Prix from 2019 to 2024. Pick one to replay it on the Time
-          Machine, run alternate strategies in the What-If Lab, or have Granite solve
-          a Glory Path for your favourite driver.
-        </p>
+        {scoped && (
+          <div className="hero-breadcrumb">
+            <Link to="/seasons">Seasons</Link> <span>/</span> <span>{year}</span>
+          </div>
+        )}
+        <div className="hero-eyebrow" style={{ color: season?.accent ?? "var(--f1-red)" }}>
+          {season ? `${season.year} - ${season.champion.team}` : "RACE LIBRARY"}
+        </div>
+        <div className="hero-title">
+          {season ? season.tagline : "Rewrite the past, race by race."}
+        </div>
+        {season ? (
+          <p className="hero-sub">{season.narrative}</p>
+        ) : (
+          <p className="hero-sub">
+            Browse every Grand Prix from 2019 to 2024. Pick one to replay it on the Time
+            Machine, run alternate strategies in the What-If Lab, or have Granite solve
+            a Glory Path for your favourite driver.
+          </p>
+        )}
       </div>
 
       {stats && (
@@ -81,7 +110,7 @@ export default function LibraryPage() {
             key={y}
             type="button"
             className={`year-pill ${y === year ? "active" : ""}`}
-            onClick={() => setYear(y)}
+            onClick={() => changeYear(y)}
           >
             {y}
           </button>

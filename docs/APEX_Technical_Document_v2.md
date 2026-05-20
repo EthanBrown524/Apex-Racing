@@ -8,18 +8,20 @@
 
 ## 1. Product summary
 
-APEX turns every Grand Prix from 2019-2024 into an editable timeline. Six routes:
+APEX turns every Grand Prix from 2019-2024 into an editable timeline. Nine routes:
 
-| Mode | Path | What it does |
+| Page | Path | What it does |
 |------|------|--------------|
-| **Library** | `/` | Grid of every race grouped by season, click to open. |
-| **Showcase** | `/showcase` | One-click, pre-baked demo scenarios (Abu Dhabi 2021, Monaco 2022, Brazil 2022, Singapore 2023, Glory Path: Alonso, Glory Path: Leclerc). Each card auto-loads its changes into the relevant mode. |
-| **Time Machine** | `/rewind/:raceId` | Replay a race with telemetry-driven car positions, live leaderboard, lap-by-lap AI commentary, free-form "Ask APEX", and keyboard shortcuts (Space, arrow keys, R). |
-| **What-If Lab** | `/rewind/:raceId` (right rail) | Apply strategy changes (7 types). The deterministic simulator recomputes the standings; Granite explains the new outcome with citations; **Realism Score** chip judges plausibility; **Championship Impact** card recomputes the season standings. |
-| **Glory Path** | `/glory/:raceId` | Pick a driver + target finish position. APEX greedy-searches the smallest set of changes that gets them there; Granite narrates the alternate storyline; animated position countdown shows P-start to P-achieved. |
-| **Forecast** | `/forecast/:raceId` | Win-probability bars + circuit-DNA radar derived from historical aggregates. |
-| **Stats** | `/stats` | Scale showcase - animated big numbers (races, laps, pit stops, telemetry points, RAG chunks), per-season progress bars, IBM stack panel. |
-| **About** | `/about` | Stack overview, feature cards, F1-jargon glossary tooltips, scale strip. |
+| **Home** | `/` | Marketing landing page - hero with bold typography, animated scale strip, three pillars (Time Machine / What-If / Glory Path), an "AI in F1" narrative section, featured scenarios row, IBM stack cards, final CTA. |
+| **Seasons** | `/seasons` | Six rich year cards - 2019..2024 - with champion, tagline, narrative, iconic moment, and per-season ingestion progress bar. Primary year-selection surface. |
+| **Library** | `/library`, `/seasons/:year` | Race grid filtered by year + free-text search. Year-scoped view shows season narrative as the hero. |
+| **Showcase** | `/showcase` | Pre-baked demo scenarios (Abu Dhabi 2021, Monaco 2022, Brazil 2022, Singapore 2023, Glory Path: Alonso, Glory Path: Leclerc). One-click launch into the relevant mode. |
+| **Time Machine** | `/rewind/:raceId` | Replay a race with telemetry-driven car positions, live leaderboard, lap-by-lap AI commentary, free-form "Ask APEX", and keyboard shortcuts. |
+| **What-If Lab** | right rail of `/rewind/:raceId` | Apply strategy changes (7 types). Deterministic simulator recomputes standings; Granite explains with citations; Realism chip + Championship Impact card. |
+| **Glory Path** | `/glory/:raceId` | Pick a driver + target position. Greedy search finds minimum interventions; Granite narrates with citations; animated P-countdown hero. |
+| **Forecast** | `/forecast/:raceId` | Win-probability bars + circuit-DNA radar. |
+| **Stats** | `/stats` | Scale showcase - animated big-number heroes, per-season progress bars, IBM stack panel. |
+| **About** | `/about` | Stack overview + glossary tooltips + scale strip. |
 
 The whole UI runs against a single FastAPI service; the frontend never calls IBM endpoints directly. A `Footer` component fetches `/health` and surfaces live diagnostics (ingested race count, Granite status, pgvector status).
 
@@ -101,14 +103,19 @@ frontend/src/
   api/
     apexClient.js         Axios wrapper for every backend endpoint
   data/                   Static data + fallbacks (no React, no logic)
-    sampleData.js         Offline fallback races + laps + circuit path
+    sampleData.js         Offline fallback - 28 sample races across 6 seasons + sampleStats
     teamColors.js         Team -> color map for 2019-2024, per-driver lookup
+    seasons.js            Year metadata (champion, tagline, narrative,
+                          iconic moment, accent colour) for the Seasons page
   styles/                 Single-theme CSS split by concern; index.css imports the rest
     index.css             Entry point - just @imports the four below in order
     base.css              :root design tokens, reset, typography, keyframes
     layout.css            App shell, topbar, nav, page grids, race bar, responsive
     components.css        Buttons, forms, leaderboard, track HUD, what-if, citations, ai chat
     pages.css             Library grid, Glory hero, Forecast layout, About hero
+    home.css              Home + Seasons landing pages (hero, pillars, narrative beats, year cards)
+    stats.css             Stats page + StatStrip
+    extras.css            ChampionshipImpact, RealismChip, Showcase, Skeleton, Footer, Glossary, KeyboardHints
   hooks/
     useRaceData.js        races + circuit path + lap data, with per-race cache
     useTelemetry.js       per-lap telemetry prefetch
@@ -117,10 +124,15 @@ frontend/src/
     useCommentary.js      GET /ai/commentary/{id}
     useAIChat.js          stateful conversation against POST /ai/ask
   pages/
-    LibraryPage.jsx       race grid filtered by season + search; skeleton loaders
-                          + scale strip (Grand Prix / Laps / Pit stops / Data points)
-    StatsPage.jsx         scale showcase - animated big numbers + season bars
-                          + IBM stack panel
+    HomePage.jsx          landing page - hero, scale strip, three pillars,
+                          AI-in-F1 narrative beats, featured scenarios, IBM
+                          stack cards, final CTA
+    SeasonsPage.jsx       year selection grid - rich cards per season with
+                          champion + tagline + narrative + iconic moment +
+                          ingestion progress bar
+    LibraryPage.jsx       race grid; accepts /:year to scope; shows the season
+                          narrative as hero when scoped; skeleton loaders; scale strip
+    StatsPage.jsx         scale showcase - animated big numbers + season bars + IBM stack panel
     ShowcasePage.jsx      curated demo cards; one-click launch with pre-filled changes
     RewindPage.jsx        TrackCanvas + Leaderboard + WhatIfPanel|AIChatBox + AINarrator
                           + ChampionshipImpact + RealismChip + keyboard shortcuts
@@ -398,19 +410,26 @@ DB_POOL_RECYCLE=1800
 
 ## 10. Demo script (2-minute pitch)
 
-1. **Showcase** -> click "Abu Dhabi 2021 - the title-deciding lap". (Pre-loads
-   the counterfactual into Time Machine.)
-2. The race opens with the change already staged. Hit **Simulate**.
-3. Granite explanation appears with citations and a **Realism chip** (e.g.
-   "Realism 73% Plausible").
-4. Click **Show championship impact**. Card flips with "TITLE CHANGES"
-   badge - alternate champion vs actual, biggest movers, narrative.
-5. Switch right rail to **Ask APEX**: "what happened to PER?". Granite
+1. **Land on /** — Home page. Hero says "Rewrite Formula 1. Powered by IBM
+   Granite." Scale strip shows the live count of races/laps/pit stops/data
+   points. Scroll past the three pillars and the AI-in-F1 narrative.
+2. Click **Browse seasons**. Six rich year cards: 2019..2024, each with
+   champion, tagline, narrative, and an ingestion progress bar.
+3. Click **2021**. Library scoped to that year - hero reads "The closest
+   title fight of the century" with the season narrative.
+4. (Or jump straight from Home to **Showcase** -> "Abu Dhabi 2021 - the
+   title-deciding lap" for the headline demo.)
+5. The race opens with the change already staged. Hit **Simulate**.
+6. Granite explanation appears with citations and a **Realism chip**
+   ("Realism 73% Plausible").
+7. Click **Show championship impact**. Card flips with "TITLE CHANGES" - the
+   alternate champion, biggest movers, narrative.
+8. Switch right rail to **Ask APEX**: "what happened to PER?". Granite
    answers with [1] [2] citations.
-6. Navigate to **Glory Path**. Showcase card "Glory Path - Alonso back to the
-   top step" auto-solves; watch the animated `P7 -> P1` countdown.
-7. Wrap on **About**: hover over `undercut` and `VSC` to show the glossary
-   tooltips; point at the Footer chips for the live IBM-stack diagnostics.
+9. Navigate to **Glory Path** -> Alonso back to the top step. Animated
+   `P7 -> P1` countdown.
+10. Finish on **Stats**: the scale numbers count up live. Point at the Footer
+    chips for the IBM-stack diagnostics.
 
 ## 11. Tests
 

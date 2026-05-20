@@ -23,6 +23,9 @@ Work top-to-bottom. Each task lists the **files** touched, what to **do**, and a
 - [x] `ingestion.status` CLI - per-season progress bars
 - [x] `ingestion.export` CLI - DB to JSON dump for portability
 - [x] Expanded `sampleData.js` from 1 race to 28 sample races across 2019-2024
+- [x] Site IA: dedicated Home (`/`) landing page + Seasons (`/seasons`) year-selection grid + year-scoped Library (`/seasons/:year`)
+- [x] Marketing-style sections on Home: hero, scale strip, three pillars, "AI in F1" narrative beats, featured scenarios, IBM stack cards
+- [x] `frontend/src/data/seasons.js` with champion / tagline / narrative / iconic-moment per season
 
 The remaining waves stay below.
 

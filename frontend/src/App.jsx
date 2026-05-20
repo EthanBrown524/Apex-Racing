@@ -4,8 +4,10 @@ import Footer from "./components/Footer/Footer.jsx";
 import AboutPage from "./pages/AboutPage.jsx";
 import ForecastPage from "./pages/ForecastPage.jsx";
 import GloryPathPage from "./pages/GloryPathPage.jsx";
+import HomePage from "./pages/HomePage.jsx";
 import LibraryPage from "./pages/LibraryPage.jsx";
 import RewindPage from "./pages/RewindPage.jsx";
+import SeasonsPage from "./pages/SeasonsPage.jsx";
 import ShowcasePage from "./pages/ShowcasePage.jsx";
 import StatsPage from "./pages/StatsPage.jsx";
 
@@ -21,7 +23,9 @@ export default function App() {
           </span>
         </div>
         <nav className="topnav" aria-label="Primary">
-          <NavLink to="/" end>Library</NavLink>
+          <NavLink to="/" end>Home</NavLink>
+          <NavLink to="/seasons">Seasons</NavLink>
+          <NavLink to="/library">Library</NavLink>
           <NavLink to="/showcase">Showcase</NavLink>
           <NavLink to="/rewind">Time Machine</NavLink>
           <NavLink to="/glory">Glory Path</NavLink>
@@ -32,7 +36,10 @@ export default function App() {
       </header>
 
       <Routes>
-        <Route path="/" element={<LibraryPage />} />
+        <Route path="/" element={<HomePage />} />
+        <Route path="/seasons" element={<SeasonsPage />} />
+        <Route path="/seasons/:year" element={<LibraryPage />} />
+        <Route path="/library" element={<LibraryPage />} />
         <Route path="/showcase" element={<ShowcasePage />} />
         <Route path="/rewind" element={<RewindPage />} />
         <Route path="/rewind/:raceId" element={<RewindPage />} />
