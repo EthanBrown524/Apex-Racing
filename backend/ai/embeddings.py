@@ -38,17 +38,17 @@ def embed_texts(texts: list[str], target_dim: int = LEGACY_DIM) -> list[list[flo
     if not api_key or not project_id:
         return [_hash_embed(t, target_dim) for t in texts]
 
-    watsonx_url = os.getenv("WATSONX_URL", "https://us-south.ml.cloud.ibm.com")
-    url = f"{watsonx_url}/ml/v1/text/embeddings?version={WATSONX_VERSION}"
-    token = get_access_token()
-
-    payload = {
-        "model_id": EMBED_MODEL_ID,
-        "project_id": project_id,
-        "inputs": texts,
-    }
-
     try:
+        watsonx_url = os.getenv("WATSONX_URL", "https://us-south.ml.cloud.ibm.com")
+        url = f"{watsonx_url}/ml/v1/text/embeddings?version={WATSONX_VERSION}"
+        token = get_access_token()
+
+        payload = {
+            "model_id": EMBED_MODEL_ID,
+            "project_id": project_id,
+            "inputs": texts,
+        }
+
         response = httpx.post(
             url,
             headers={

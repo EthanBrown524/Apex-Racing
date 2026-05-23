@@ -126,7 +126,7 @@ def narrate_race(race_id: int, up_to_lap: int | None = None) -> dict:
     prompt = _commentary_prompt(summary, rag["context"])
 
     try:
-        text_out = generate(prompt, max_new_tokens=350, temperature=0.55)
+        text_out = generate(prompt, max_new_tokens=180, temperature=0.45, timeout=18)
         narrative = text_out.strip()
     except Exception as exc:
         narrative = _fallback_narrative(summary, exc)

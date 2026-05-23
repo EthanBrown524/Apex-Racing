@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { NavLink, Route, Routes } from "react-router-dom";
+import { NavLink, Route, Routes, useLocation } from "react-router-dom";
 
 import Footer from "./components/Footer/Footer.jsx";
 
@@ -14,8 +14,11 @@ const ShowcasePage = lazy(() => import("./pages/ShowcasePage.jsx"));
 const StatsPage = lazy(() => import("./pages/StatsPage.jsx"));
 
 export default function App() {
+  const location = useLocation();
+  const isSimulator = location.pathname.startsWith("/rewind");
+
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isSimulator ? "simulator-shell" : ""}`}>
       <header className="topbar">
         <div className="brand">
           <span className="brand-badge">APEX</span>
@@ -55,7 +58,7 @@ export default function App() {
         </Routes>
       </Suspense>
 
-      <Footer />
+      {!isSimulator && <Footer />}
     </div>
   );
 }

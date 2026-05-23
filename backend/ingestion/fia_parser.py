@@ -31,9 +31,33 @@ def _docling_extract(pdf_path: Path) -> str:
         doc = result.document
         return doc.export_to_markdown()
     except ImportError:
+        fallback = _pdfium_extract(pdf_path)
+        if fallback:
+            return fallback
         return f"(Docling not installed - install with `pip install docling`. Skipped {pdf_path.name}.)"
     except Exception as exc:
+        fallback = _pdfium_extract(pdf_path)
+        if fallback:
+            return fallback
         return f"(Docling failed on {pdf_path.name}: {exc})"
+
+
+def _pdfium_extract(pdf_path: Path) -> str:
+    """Lightweight text fallback for PDFs Docling cannot parse cleanly."""
+    try:
+        import pypdfium2 as pdfium
+
+        pdf = pdfium.PdfDocument(str(pdf_path))
+        pages: list[str] = []
+        for page in pdf:
+            textpage = page.get_textpage()
+            pages.append(textpage.get_text_range())
+            textpage.close()
+            page.close()
+        pdf.close()
+        return "\n\n".join(page.strip() for page in pages if page.strip())
+    except Exception:
+        return ""
 
 
 def parse_fia_pdf(

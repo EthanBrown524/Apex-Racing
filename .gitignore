@@ -8,6 +8,7 @@ dist/
 .DS_Store
 *.log
 fia_pdfs/
+backend/fia_pdfs/
 fastf1_cache/
 *.db
 .pytest_cache/

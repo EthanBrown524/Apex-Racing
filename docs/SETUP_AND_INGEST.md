@@ -193,10 +193,22 @@ python -m ingestion.run_bulk --years 2024 --full-telemetry --skip-embeddings
 
 ### 6e. (Optional) FIA stewards' decisions via Docling
 
-Drop FIA decision PDFs into `backend/fia_pdfs/` (download from https://www.fia.com/documents). Then:
+Download the curated official FIA PDF manifest:
 
 ```powershell
-python -m ingestion.fia_parser backend/fia_pdfs/
+python -m ingestion.fia_sources download
+```
+
+Then ingest the downloaded PDFs into the RAG index:
+
+```powershell
+python -m ingestion.fia_sources ingest
+```
+
+Or do both in one command:
+
+```powershell
+python -m ingestion.fia_sources all
 ```
 
 If you only have one PDF for one race:

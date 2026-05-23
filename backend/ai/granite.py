@@ -44,7 +44,12 @@ def get_access_token() -> str:
     return _cached_token
 
 
-def generate(prompt: str, max_new_tokens: int = 500, temperature: float = 0.7) -> str:
+def generate(
+    prompt: str,
+    max_new_tokens: int = 500,
+    temperature: float = 0.7,
+    timeout: float = 60,
+) -> str:
     project_id = os.getenv("WATSONX_PROJECT_ID")
     watsonx_url = os.getenv("WATSONX_URL", "https://us-south.ml.cloud.ibm.com")
 
@@ -71,7 +76,7 @@ def generate(prompt: str, max_new_tokens: int = 500, temperature: float = 0.7) -
             "Content-Type": "application/json",
         },
         json=payload,
-        timeout=60,
+        timeout=timeout,
     )
     response.raise_for_status()
 

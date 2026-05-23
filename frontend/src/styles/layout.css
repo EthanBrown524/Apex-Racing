@@ -6,6 +6,11 @@
   padding: 0;
 }
 
+.simulator-shell {
+  min-height: 100vh;
+  overflow: hidden;
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -108,12 +113,15 @@
   flex-direction: column;
   border-right: 1px solid var(--line);
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .right-col {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   overflow: hidden;
   background: var(--bg-1);
 }
