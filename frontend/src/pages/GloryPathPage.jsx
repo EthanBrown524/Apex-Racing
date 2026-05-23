@@ -6,18 +6,6 @@ import { fetchRaces } from "../api/apexClient.js";
 import { sampleRaces } from "../data/sampleData.js";
 import { useGloryPath } from "../hooks/useGloryPath.js";
 
-function useCountdown(target, ms = 700) {
-  const [value, setValue] = useState(target);
-  useEffect(() => {
-    if (target == null) {
-      setValue(target);
-      return;
-    }
-    setValue(target);
-  }, [target]);
-  return value;
-}
-
 function AnimatedPosition({ from, to }) {
   const [shown, setShown] = useState(from ?? to);
 

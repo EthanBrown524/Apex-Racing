@@ -11,8 +11,8 @@ fia_pdfs/
 fastf1_cache/
 *.db
 .pytest_cache/
+pytest-cache-files-*/
 .coverage
 htmlcov/
 .tmp/
 backend/%SystemDrive%/
-

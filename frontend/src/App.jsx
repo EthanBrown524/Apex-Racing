@@ -1,15 +1,17 @@
+import { lazy, Suspense } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 
 import Footer from "./components/Footer/Footer.jsx";
-import AboutPage from "./pages/AboutPage.jsx";
-import ForecastPage from "./pages/ForecastPage.jsx";
-import GloryPathPage from "./pages/GloryPathPage.jsx";
-import HomePage from "./pages/HomePage.jsx";
-import LibraryPage from "./pages/LibraryPage.jsx";
-import RewindPage from "./pages/RewindPage.jsx";
-import SeasonsPage from "./pages/SeasonsPage.jsx";
-import ShowcasePage from "./pages/ShowcasePage.jsx";
-import StatsPage from "./pages/StatsPage.jsx";
+
+const AboutPage = lazy(() => import("./pages/AboutPage.jsx"));
+const ForecastPage = lazy(() => import("./pages/ForecastPage.jsx"));
+const GloryPathPage = lazy(() => import("./pages/GloryPathPage.jsx"));
+const HomePage = lazy(() => import("./pages/HomePage.jsx"));
+const LibraryPage = lazy(() => import("./pages/LibraryPage.jsx"));
+const RewindPage = lazy(() => import("./pages/RewindPage.jsx"));
+const SeasonsPage = lazy(() => import("./pages/SeasonsPage.jsx"));
+const ShowcasePage = lazy(() => import("./pages/ShowcasePage.jsx"));
+const StatsPage = lazy(() => import("./pages/StatsPage.jsx"));
 
 export default function App() {
   return (
@@ -35,21 +37,23 @@ export default function App() {
         </nav>
       </header>
 
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/seasons" element={<SeasonsPage />} />
-        <Route path="/seasons/:year" element={<LibraryPage />} />
-        <Route path="/library" element={<LibraryPage />} />
-        <Route path="/showcase" element={<ShowcasePage />} />
-        <Route path="/rewind" element={<RewindPage />} />
-        <Route path="/rewind/:raceId" element={<RewindPage />} />
-        <Route path="/glory" element={<GloryPathPage />} />
-        <Route path="/glory/:raceId" element={<GloryPathPage />} />
-        <Route path="/forecast" element={<ForecastPage />} />
-        <Route path="/forecast/:raceId" element={<ForecastPage />} />
-        <Route path="/stats" element={<StatsPage />} />
-        <Route path="/about" element={<AboutPage />} />
-      </Routes>
+      <Suspense fallback={<div className="empty">Loading...</div>}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/seasons" element={<SeasonsPage />} />
+          <Route path="/seasons/:year" element={<LibraryPage />} />
+          <Route path="/library" element={<LibraryPage />} />
+          <Route path="/showcase" element={<ShowcasePage />} />
+          <Route path="/rewind" element={<RewindPage />} />
+          <Route path="/rewind/:raceId" element={<RewindPage />} />
+          <Route path="/glory" element={<GloryPathPage />} />
+          <Route path="/glory/:raceId" element={<GloryPathPage />} />
+          <Route path="/forecast" element={<ForecastPage />} />
+          <Route path="/forecast/:raceId" element={<ForecastPage />} />
+          <Route path="/stats" element={<StatsPage />} />
+          <Route path="/about" element={<AboutPage />} />
+        </Routes>
+      </Suspense>
 
       <Footer />
     </div>

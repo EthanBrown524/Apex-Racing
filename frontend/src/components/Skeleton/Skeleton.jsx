@@ -1,3 +1,5 @@
+import { createElement } from "react";
+
 export function SkeletonRow() {
   return (
     <div className="lboard-row skeleton-row">
@@ -27,7 +29,7 @@ export function SkeletonList({ rows = 6, Component = SkeletonRow }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <Component key={i} />
+        createElement(Component, { key: i })
       ))}
     </>
   );

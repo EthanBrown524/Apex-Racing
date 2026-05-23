@@ -40,7 +40,7 @@ React (Vite) <--> FastAPI <--> PostgreSQL + pgvector
                       +--> FastF1 / Ergast (ingestion)
 ```
 
-10 FastAPI routers, 14 AI modules, 48 pytest smoke tests, ~4500 lines of code.
+10 FastAPI routers, 14 AI modules, 7 smoke test files, ~4500 lines of code.
 
 ## Docs
 
@@ -97,7 +97,8 @@ cd backend
 pytest tests/ -v
 ```
 
-18 smoke tests; no Postgres or IBM credentials required.
+The smoke test suite is organized across 7 test files and does not require
+Postgres or IBM credentials.
 
 ## Live diagnostics
 
