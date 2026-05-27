@@ -16,4 +16,3 @@ pytest-cache-files-*/
 .coverage
 htmlcov/
 .tmp/
-backend/%SystemDrive%/

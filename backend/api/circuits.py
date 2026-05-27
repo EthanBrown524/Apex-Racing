@@ -7,7 +7,7 @@ from db.models import Circuit
 router = APIRouter(prefix="/circuits", tags=["circuits"])
 
 
-@router.get("/")
+@router.get("")
 def list_circuits(db: Session = Depends(get_db)) -> list[dict]:
     circuits = db.query(Circuit).order_by(Circuit.name).all()
     return [

@@ -1,16 +1,14 @@
 """Realism scoring tests - exercises the heuristic without calling Granite."""
 
-import os
 import pytest
 
 from ai import realism
 
 
 @pytest.fixture(autouse=True)
-def _no_granite(monkeypatch):
-    """Force Granite to be unavailable so the heuristic path runs."""
-    monkeypatch.delenv("IBM_API_KEY", raising=False)
-    monkeypatch.delenv("WATSONX_PROJECT_ID", raising=False)
+def _force_no_granite(no_granite):
+    """Re-export the shared fixture as autouse for this module."""
+    return no_granite
 
 
 def test_no_changes_is_perfectly_realistic():
