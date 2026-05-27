@@ -5,6 +5,8 @@
 
 Work top-to-bottom. Each task lists the **files** touched, what to **do**, and an **acceptance** check (a grep, a curl, or a UI behaviour). Don't skip the acceptance step.
 
+> **Last refresh:** the build now has 12 routers, 14 AI modules, 11 frontend pages, and a 94-test smoke suite. Wave 2 and most of Waves 3-6 are done. The remaining items are flagged inline.
+
 ## What's already done (don't redo)
 
 - [x] Championship Impact endpoint + card (`backend/ai/championship.py`, `frontend/.../ChampionshipImpact/`)
@@ -15,7 +17,7 @@ Work top-to-bottom. Each task lists the **files** touched, what to **do**, and a
 - [x] Glory Path animated `P-start -> P-achieved` countdown
 - [x] Keyboard shortcuts on Time Machine (Space / ←→ / R)
 - [x] Glossary tooltips (`Glossary/GlossaryTerm.jsx`) used on AboutPage
-- [x] Test suite: 18 passing pytest smoke tests under `backend/tests/`
+- [x] Test suite: 94 passing pytest smoke tests under `backend/tests/` (CI: `.github/workflows/test.yml`)
 - [x] Folder restructure: `backend/utils/` removed, `frontend/src/data/`, `frontend/src/styles/` split
 - [x] Stats page (`/stats`) + `/stats` endpoint + StatHero/StatStrip animated count-ups
 - [x] Scale strip on Library + About showing live Grand Prix / Laps / Pit stops / Data points
@@ -27,12 +29,19 @@ Work top-to-bottom. Each task lists the **files** touched, what to **do**, and a
 - [x] Marketing-style sections on Home: hero, scale strip, three pillars, "AI in F1" narrative beats, featured scenarios, IBM stack cards
 - [x] `frontend/src/data/seasons.js` with champion / tagline / narrative / iconic-moment per season
 - [x] AI Race Director (Option B): `driver_profiles.py` + `race_director.py` + `change_expander.py` + ai_director flag on /counterfactual/simulate + Race Director Notes UI card + 30 new tests (48 total)
+- [x] **Wave 2 complete** - citation popovers, LIVE-pill pulse, leaderboard skeletons, glory arrow slide-in, tire donuts
+- [x] **Wave 3** - safety_car gap compression (3.1), `/counterfactual/compare` (3.3), Glory Path persisted as Scenario (3.4), `/drivers/{code}/season-points/{year}` (3.5)
+- [x] **Wave 4** - DriverPage, ComparePage, StandingsPage
+- [x] **Wave 5.3** - Granite "coach me" rewrite for Glory Path rationales
+- [x] **Wave 6.1** - hands-free auto-rotating showcase (`/showcase?auto=1`)
+- [x] FIA ingestion conventions documented (`docs/FIA_INGESTION.md`)
+- [x] HomePage now surfaces `health.ingestion_complete` so judges aren't shown sample data silently
 
 The remaining waves stay below.
 
 Prerequisites you can take for granted:
 - The branch `claude/analyze-project-jBgIH` already contains the architecture in `docs/APEX_Technical_Document_v2.md`.
-- `backend/main.py` registers all seven routers; do not duplicate.
+- `backend/main.py` registers **12** routers (races, circuits, counterfactual, forecast, scenarios, glory_path, commentary, championship, showcase, health, stats, drivers); do not duplicate.
 - The frontend builds with `npm run dev` from `frontend/`. The backend boots with `uvicorn main:app --reload` from `backend/`.
 
 When in doubt: read `docs/APEX_Technical_Document_v2.md` first.
@@ -76,18 +85,9 @@ python -m ingestion.embed_races --years 2019 2020 2021 2022 2023 2024
 
 If a year fails partway: re-run, it's restart-safe.
 
-### Task 1.2 - Add seed FIA decisions
+### Task 1.2 - Add seed FIA decisions ✅ DONE
 
-There are no FIA PDFs in the repo yet (deliberately - they're large). Add a `backend/fia_pdfs/` directory and document the convention:
-
-**Files to add:**
-- `backend/fia_pdfs/.gitkeep`
-- `docs/FIA_INGESTION.md` (10-line readme: where to drop PDFs, how to map to race_id)
-
-Update `.gitignore` so `backend/fia_pdfs/*.pdf` are ignored. Run:
-```bash
-python -m ingestion.fia_parser backend/fia_pdfs/
-```
+Directory convention + `.gitkeep` + [`docs/FIA_INGESTION.md`](FIA_INGESTION.md) all in place. Only the PDFs themselves need to be dropped (see the doc).
 
 **Acceptance:** `select source, count(*) from race_embeddings group by 1;` shows a `fia_decision` row when any PDF exists.
 
@@ -99,7 +99,7 @@ Currently `LibraryPage` falls back to `sampleData.sampleRaces` (one race only) w
 
 ---
 
-## Wave 2 - Visual polish
+## Wave 2 - Visual polish ✅ DONE
 
 These tasks are pure CSS / small JSX tweaks. No new endpoints.
 
@@ -145,7 +145,7 @@ The `LapTime.tire` value is a single letter (S/M/H/I/W). Already styled. Add a s
 
 ## Wave 3 - Backend extensions
 
-### Task 3.1 - Extend `safety_car` change to influence position
+### Task 3.1 - Extend `safety_car` change to influence position ✅ DONE
 
 Currently `safety_car` only refunds pit penalty time. Improve it: compress all gap_to_leader values within the SC window to a maximum of 1500 ms (simulates the field bunching). Edit `backend/ai/counterfactual.py:_apply_changes`.
 
@@ -157,7 +157,7 @@ Add `tire_in/tire_out` parsing in `backend/ingestion/ergast.py:ingest_pit_stops`
 
 **Acceptance:** `select tire_out, count(*) from pit_stops group by 1` shows S/M/H values.
 
-### Task 3.3 - "Compare two simulations" endpoint
+### Task 3.3 - "Compare two simulations" endpoint ✅ DONE
 
 `POST /counterfactual/compare` accepts `{ race_id, scenario_a: changes[], scenario_b: changes[] }` and returns both `alt_laps` plus a position-by-position diff per driver on the final lap.
 
@@ -165,13 +165,13 @@ Add `tire_in/tire_out` parsing in `backend/ingestion/ergast.py:ingest_pit_stops`
 
 **Acceptance:** `curl -X POST localhost:8000/counterfactual/compare -d '...'` returns `{ a: {...}, b: {...}, diff: [{code, a_pos, b_pos, delta}] }`.
 
-### Task 3.4 - Persist Glory Path results
+### Task 3.4 - Persist Glory Path results ✅ DONE
 
 When a Glory Path is solved, save it as a `Scenario` with a generated label like "Glory: HAM -> P1 (Monaco 2023)". Edit `backend/ai/glory_path.py`.
 
 **Acceptance:** `GET /scenarios` includes the entry after a solve.
 
-### Task 3.5 - Champion timeline endpoint
+### Task 3.5 - Champion timeline endpoint ✅ DONE
 
 Add `GET /drivers/{code}/season-points/{year}` that returns `[{round, race_name, points, cumulative_points}]`.
 
@@ -181,9 +181,9 @@ Add `GET /drivers/{code}/season-points/{year}` that returns `[{round, race_name,
 
 ---
 
-## Wave 4 - New frontend pages
+## Wave 4 - New frontend pages ✅ DONE
 
-### Task 4.1 - Driver page
+### Task 4.1 - Driver page ✅ DONE
 
 **Route:** `/driver/:code/:year`
 **Files:** new `frontend/src/pages/DriverPage.jsx`, route in `App.jsx`.
@@ -192,7 +192,7 @@ Show: driver header (name + team color + nationality), Recharts line chart of cu
 
 **Acceptance:** click `VER` on Monaco 2023 leaderboard -> see VER season chart.
 
-### Task 4.2 - Compare scenarios page
+### Task 4.2 - Compare scenarios page ✅ DONE
 
 **Route:** `/compare/:raceId`
 **Files:** new `frontend/src/pages/ComparePage.jsx`, hook `useScenarioCompare.js`, uses the endpoint from Task 3.3.
@@ -201,7 +201,7 @@ Left rail: two WhatIfPanel instances (A and B). Center: side-by-side final class
 
 **Acceptance:** apply different changes in A vs B, click Compare, see position deltas.
 
-### Task 4.3 - Standings page
+### Task 4.3 - Standings page ✅ DONE
 
 **Route:** `/standings/:year`
 **Files:** new `frontend/src/pages/StandingsPage.jsx`. Aggregates `RaceResult.points` from the existing `/races` data without needing a new endpoint.
@@ -229,7 +229,7 @@ Currently `ai/forecast.py:_recent_form` is a closed-form heuristic. Add an alter
 
 **Acceptance:** with credentials, the strategy text varies between races (current heuristic produces only 4 distinct strings).
 
-### Task 5.3 - "Coach me" mode in Glory Path
+### Task 5.3 - "Coach me" mode in Glory Path ✅ DONE
 
 After solving, post-process the candidate list to keep the rationale strings concise. Have Granite expand each rationale into a single coach-style sentence ("the lap-32 pit was 2.1s slower than your average - move it three laps earlier to keep tire delta").
 
@@ -245,9 +245,9 @@ For a counterfactual, score how realistic it is (0-1). Granite gets the changes 
 
 ## Wave 6 - Demo polish
 
-### Task 6.1 - Add a "Showcase" pre-baked scenario
+### Task 6.1 - Add a "Showcase" pre-baked scenario ✅ DONE
 
-A `/showcase` route that auto-runs through three pre-recorded simulations on a 6-second timer per scene. Useful for a hands-free demo.
+`/showcase?auto=1` cycles through every playable scenario on a 6-second timer with a progress bar; manual mode is the default.
 
 ### Task 6.2 - Sound effects (optional)
 

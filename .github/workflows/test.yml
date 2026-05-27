@@ -1,0 +1,40 @@
+name: backend tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pytest:
+    name: pytest smoke suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pytest
+        working-directory: backend
+        env:
+          # Strip IBM credentials so the heuristic / hash-embedding fallbacks
+          # are exercised in CI rather than the live watsonx endpoints.
+          IBM_API_KEY: ""
+          WATSONX_PROJECT_ID: ""
+        run: |
+          pytest tests/ -v --maxfail=1
