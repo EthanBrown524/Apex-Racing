@@ -170,6 +170,24 @@
   box-shadow: 0 12px 32px rgba(0,0,0,0.55);
 }
 .showcase-card:disabled { opacity: 0.6; cursor: not-allowed; }
+.showcase-card.active-auto {
+  border-color: var(--accent, var(--f1-red));
+  box-shadow: 0 0 0 1px var(--accent, var(--f1-red)),
+              0 14px 36px rgba(232,0,45,0.25);
+  transform: translateY(-2px);
+}
+.showcase-card.active-auto::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3px;
+  background: var(--accent, var(--f1-red));
+  animation: showcase-bar 6s linear forwards;
+}
+@keyframes showcase-bar {
+  0%   { transform: scaleX(0); transform-origin: left; }
+  100% { transform: scaleX(1); transform-origin: left; }
+}
 .showcase-tag {
   font-size: 9px;
   letter-spacing: 1px;

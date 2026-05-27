@@ -80,6 +80,11 @@ export default function ForecastPage() {
           <div className="meta-pill">Circuit <strong>{selectedRace?.circuit_name ?? "-"}</strong></div>
           <div className="meta-pill">Round <strong>{selectedRace?.round ?? "-"}</strong></div>
           <div className="meta-pill">Source <strong>{status}</strong></div>
+        {forecast?.source && (
+          <div className="meta-pill">
+            Ranking <strong>{forecast.source === "granite" ? "Granite" : "Heuristic"}</strong>
+          </div>
+        )}
         </div>
       </div>
 

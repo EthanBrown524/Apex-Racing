@@ -75,7 +75,10 @@ export default function AIChatBox({ raceId }) {
               >
                 {m.role === "user" ? "YOU" : "GRANITE"}
               </div>
-              <div>{m.text}</div>
+              <div>
+                {m.text}
+                {m.streaming && <span className="ai-stream-caret" aria-hidden="true" />}
+              </div>
               {m.citations && <Citations citations={m.citations} />}
             </div>
           ))}

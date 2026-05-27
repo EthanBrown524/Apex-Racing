@@ -1,17 +1,44 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { StatStrip } from "../components/StatHero/StatHero.jsx";
+import { fetchHealth } from "../api/apexClient.js";
 import { SEASONS } from "../data/seasons.js";
 import { useShowcase } from "../hooks/useShowcase.js";
 import { useStats } from "../hooks/useStats.js";
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { data: stats } = useStats();
+  const { data: stats, status: statsStatus } = useStats();
   const { scenarios } = useShowcase();
+  const [health, setHealth] = useState(null);
+
+  useEffect(() => {
+    fetchHealth().then(setHealth).catch(() => setHealth(null));
+  }, []);
+
+  const usingSampleData = statsStatus === "sample";
+  const ingestionIncomplete =
+    health && health.ingestion_complete === false;
+  const showStatusBanner = usingSampleData || ingestionIncomplete;
 
   return (
     <div className="home">
+      {showStatusBanner && (
+        <div className="home-status-banner" role="status">
+          <strong>Heads up:</strong>{" "}
+          {usingSampleData
+            ? "the backend isn't returning live data, so figures below come from a sample dataset."
+            : "ingestion is incomplete - some seasons may be missing."}{" "}
+          <span>
+            Run{" "}
+            <code>python -m ingestion.run_bulk --years 2019 2020 2021 2022 2023 2024</code>
+            {" "}
+            to fix.
+          </span>
+        </div>
+      )}
+
       <section className="home-hero">
         <div className="home-hero-eyebrow">RACE DIRECTOR - F1 2019-2024</div>
         <h1 className="home-hero-title">

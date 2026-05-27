@@ -153,7 +153,18 @@
   color: transparent;
 }
 .glory-pos.target .val { background: linear-gradient(180deg, #ffd24a, #e8002d); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.glory-arrow { color: var(--f1-green); font-size: 28px; font-weight: 700; }
+.glory-arrow {
+  color: var(--f1-green);
+  font-size: 28px;
+  font-weight: 700;
+  animation: glory-arrow-slide 520ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+@keyframes glory-arrow-slide {
+  0%   { transform: translateX(-18px); opacity: 0; }
+  60%  { transform: translateX(3px);   opacity: 1; }
+  100% { transform: translateX(0);     opacity: 1; }
+}
 
 .glory-changes {
   display: grid;
@@ -262,4 +273,163 @@
 
 @media (max-width: 560px) {
   .hero-title { font-size: 32px; }
+}
+
+/* Driver page */
+.driver-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 26px 28px 24px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), transparent);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 18px;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.driver-header-name {
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  margin-top: 4px;
+}
+.driver-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-mid);
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.driver-header-code {
+  font-weight: 900;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.4px;
+}
+.driver-header-total {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 22px;
+  text-align: center;
+  min-width: 160px;
+}
+.driver-header-total .label {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.6px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.driver-header-total .val {
+  font-size: 36px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  color: var(--driver-accent, var(--text));
+}
+.driver-section { padding: 0 24px 24px; }
+.driver-section h2 {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 0 0 12px;
+}
+.driver-chart-wrap {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 8px 4px;
+}
+.driver-footer {
+  display: flex;
+  gap: 10px;
+  padding: 0 24px 32px;
+  flex-wrap: wrap;
+}
+
+/* Standings page */
+.standings-section { padding: 0 24px 24px; }
+
+/* Compare page */
+.compare-shell {
+  display: grid;
+  grid-template-columns: 320px 1fr 320px;
+  gap: 14px;
+  padding: 18px;
+}
+.compare-rail {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.compare-rail-head {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-1);
+}
+.compare-center {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.compare-action {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px;
+  text-align: center;
+}
+.button.big { font-size: 13px; padding: 10px 18px; min-height: 38px; }
+.compare-hint {
+  font-size: 12px;
+  color: var(--text-mid);
+  line-height: 1.55;
+  margin: 10px 0 0;
+}
+.compare-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.compare-summary-col {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+}
+.compare-summary-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  font-weight: 800;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.compare-summary-col ol {
+  margin: 0;
+  padding: 0 0 0 18px;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.compare-table { background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.delta-up { color: var(--f1-green); font-weight: 800; }
+.delta-down { color: var(--f1-red); font-weight: 800; }
+.delta-flat { color: var(--text-dim); font-weight: 700; }
+.delta-na { color: var(--text-dim); }
+
+@media (max-width: 1100px) {
+  .compare-shell { grid-template-columns: 1fr; }
 }

@@ -107,6 +107,27 @@ export async function fetchHealth() {
   return response.data;
 }
 
+export async function fetchDriverSummary(code) {
+  const response = await apexClient.get(`/drivers/${code}`);
+  return response.data;
+}
+
+export async function fetchDriverSeasonPoints(code, year) {
+  const response = await apexClient.get(`/drivers/${code}/season-points/${year}`);
+  return response.data;
+}
+
+export async function compareScenarios(raceId, scenarioA, scenarioB, labelA = "A", labelB = "B") {
+  const response = await apexClient.post("/counterfactual/compare", {
+    race_id: raceId,
+    scenario_a: scenarioA,
+    scenario_b: scenarioB,
+    label_a: labelA,
+    label_b: labelB,
+  });
+  return response.data;
+}
+
 export async function fetchStats() {
   const response = await apexClient.get("/stats");
   return response.data;
