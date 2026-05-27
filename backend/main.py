@@ -11,6 +11,7 @@ from api import (
     circuits,
     commentary,
     counterfactual,
+    drivers,
     forecast,
     glory_path,
     health,
@@ -57,6 +58,7 @@ app.include_router(championship.router)
 app.include_router(showcase.router)
 app.include_router(health.router)
 app.include_router(stats.router)
+app.include_router(drivers.router)
 
 
 @app.get("/")

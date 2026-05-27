@@ -157,10 +157,36 @@ def _apply_changes(baseline: dict, changes: list[dict]) -> dict[int, list[dict]]
         elif change_type == "safety_car":
             start = safe_int(value) or (target_lap or 10)
             end = start + 3
+            # 1) Pit savings: a stop made under SC is cheaper.
             for d_id, laps in laps_by_driver.items():
                 for lap in laps:
                     if start <= lap["lap"] <= end and lap.get("in_pit"):
                         lap["time_ms"] = (lap["time_ms"] or 0) - SC_PIT_SAVINGS_MS
+
+            # 2) Gap compression: the field bunches up behind the SC. For each
+            # lap in the window we equalize lap times so cumulative gaps
+            # collapse to <= 1.5 s relative to the leader. Implementation:
+            # within each lap of the window, compute the slowest survivor's
+            # time and raise everyone else's time so the per-lap delta vs
+            # the leader is at most 1.5 s / window_length.
+            window_lap_count = max(1, end - start + 1)
+            target_gap_per_lap_ms = int(1500 / window_lap_count)
+            for lap_num in range(start, end + 1):
+                lap_times_in_window: list[tuple[int, dict]] = []
+                for d_id, laps in laps_by_driver.items():
+                    for lap in laps:
+                        if lap["lap"] == lap_num and lap.get("time_ms") is not None:
+                            lap_times_in_window.append((d_id, lap))
+                if not lap_times_in_window:
+                    continue
+                slowest = max(lt[1]["time_ms"] for lt in lap_times_in_window)
+                for _d_id, lap in lap_times_in_window:
+                    # Raise every lap toward the slowest, leaving a small
+                    # per-lap delta of at most target_gap_per_lap_ms so the
+                    # accumulated gap stays <= 1500 ms over the window.
+                    floor_time = slowest - target_gap_per_lap_ms
+                    if lap["time_ms"] < floor_time:
+                        lap["time_ms"] = floor_time
 
         elif change_type == "grid_swap":
             partner_code = (value or "").upper() if isinstance(value, str) else ""

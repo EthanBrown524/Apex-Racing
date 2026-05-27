@@ -7,6 +7,8 @@ always has something to render.
 
 from __future__ import annotations
 
+import json
+import os
 from collections import defaultdict
 
 from sqlalchemy import func, select
@@ -183,6 +185,109 @@ def _risk_factors(dna: dict) -> list[str]:
     return risks
 
 
+def _granite_rerank(
+    race_name: str,
+    season: int,
+    dna: dict,
+    heuristic: list[dict],
+) -> list[dict] | None:
+    """Ask Granite to rank the heuristic prediction list and emit a fresh
+    one-line strategy per driver. Returns None when credentials are missing
+    or the response cannot be parsed - callers should fall back to the
+    heuristic list.
+    """
+    if not heuristic:
+        return None
+    if not os.getenv("IBM_API_KEY") or not os.getenv("WATSONX_PROJECT_ID"):
+        return None
+
+    from ai.granite import generate  # local import keeps the module test-friendly
+
+    feature_lines = "\n".join(
+        f"- {d['code']}: avg_pos {d['avg_position']}, recent_pts {d['recent_points']}, "
+        f"heur_win {d['win_pct']}"
+        for d in heuristic
+    )
+    dna_line = (
+        f"overtaking={dna.get('overtaking', 0.5)}, "
+        f"tire_deg={dna.get('tire_deg', 0.5)}, "
+        f"safety_car_prob={dna.get('safety_car_prob', 0.3)}, "
+        f"weather_risk={dna.get('weather_risk', 0.2)}"
+    )
+
+    prompt = f"""You are an F1 strategist. Re-rank these drivers for the {race_name} ({season}) and write a one-sentence strategy for each. Use the circuit DNA and the driver features. Reply with JSON only, no preamble.
+
+Circuit DNA: {dna_line}
+
+Driver features:
+{feature_lines}
+
+Output a JSON object with one key "drivers", a list ordered most likely winner first. Each item has:
+  - code (3 letters, must come from the feature list above)
+  - win_pct (0-1 float)
+  - strategy (one sentence, max 90 chars)
+No extra commentary. JSON:"""
+
+    try:
+        raw = generate(prompt, max_new_tokens=600, temperature=0.4, timeout=20)
+    except Exception:
+        return None
+
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("```", 2)[-1]
+        if cleaned.startswith("json"):
+            cleaned = cleaned[4:]
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        return None
+    try:
+        parsed = json.loads(cleaned[start : end + 1])
+    except json.JSONDecodeError:
+        return None
+
+    drivers = parsed.get("drivers") if isinstance(parsed, dict) else None
+    if not isinstance(drivers, list):
+        return None
+
+    by_code = {d["code"]: d for d in heuristic}
+    ranked: list[dict] = []
+    seen: set[str] = set()
+    for entry in drivers[: len(heuristic)]:
+        if not isinstance(entry, dict):
+            continue
+        code = str(entry.get("code", "")).upper().strip()[:3]
+        if not code or code not in by_code or code in seen:
+            continue
+        try:
+            win_pct = float(entry.get("win_pct", by_code[code]["win_pct"]))
+        except (TypeError, ValueError):
+            win_pct = by_code[code]["win_pct"]
+        win_pct = max(0.01, min(0.95, win_pct))
+        strategy = str(entry.get("strategy", "")).strip()[:120]
+        if not strategy:
+            strategy = by_code[code]["strategy"]
+        ranked.append(
+            {
+                **by_code[code],
+                "win_pct": round(win_pct, 3),
+                "strategy": strategy,
+            }
+        )
+        seen.add(code)
+
+    if not ranked:
+        return None
+
+    # Append any heuristic entries Granite skipped so the list stays complete.
+    for entry in heuristic:
+        if entry["code"] not in seen:
+            ranked.append(entry)
+
+    return ranked
+
+
 def build_forecast(race_id: int) -> dict:
     with SessionLocal() as db:
         race = db.get(Race, race_id)
@@ -192,14 +297,27 @@ def build_forecast(race_id: int) -> dict:
                 "predictions": [],
                 "circuit_dna": {k: 0.0 for k in DEFAULT_DNA},
                 "risk_factors": ["Race not found"],
+                "source": "missing",
             }
 
         dna = _circuit_dna(db, race.circuit_id)
         predictions = _recent_form(db, race)
+
+    source = "heuristic"
+    reranked = _granite_rerank(
+        race_name=race.name or f"Race {race_id}",
+        season=race.season_year or 0,
+        dna=dna,
+        heuristic=predictions,
+    )
+    if reranked:
+        predictions = reranked
+        source = "granite"
 
     return {
         "race_id": race_id,
         "circuit_dna": dna,
         "predictions": predictions,
         "risk_factors": _risk_factors(dna),
+        "source": source,
     }

@@ -12,7 +12,7 @@ from collections import defaultdict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ai.granite import generate
+from ai.granite import generate, generate_stream
 from ai.rag import build_race_context
 from db.connection import SessionLocal
 from db.models import Driver, LapTime, PitStop, Race, SafetyCar
@@ -174,6 +174,48 @@ Answer:"""
         "answer": answer,
         "citations": rag["citations"],
     }
+
+
+def answer_question_stream(race_id: int, question: str):
+    """Generator counterpart to answer_question. Yields successive text
+    fragments and a final newline-separated JSON envelope carrying the
+    citations after the answer body is exhausted.
+    """
+    try:
+        with SessionLocal() as db:
+            summary = _race_summary(db, race_id)
+    except ValueError as exc:
+        yield str(exc)
+        return
+
+    rag = build_race_context(race_id=race_id, query=question)
+    final = ", ".join(f"P{i+1} {c}" for i, c in enumerate(summary["final"]))
+    leaders = ", ".join(f"L{lap} {code}" for lap, code in summary["leader_changes"][:6]) or "no lead changes"
+
+    prompt = f"""You are an expert F1 race analyst. Answer the user's question using ONLY the facts and retrieved context below. Cite sources by their [number] when you use them. If the answer isn't supported by the context, say so plainly.
+
+Race: {summary['race'].name} {summary['race'].season_year}
+Final top 5: {final}
+Lead changes: {leaders}
+
+Context:
+{rag['context']}
+
+Question: {question}
+
+Answer:"""
+
+    try:
+        for chunk in generate_stream(prompt, max_new_tokens=400, temperature=0.4):
+            if chunk:
+                yield chunk
+    except Exception as exc:
+        yield f"\n\n(AI explanation unavailable: {exc})"
+
+    # Emit the citations as a final SSE event prefixed with a sentinel so the
+    # client can pluck them out without confusing them for answer text.
+    import json
+    yield "\n\n[[CITATIONS]]" + json.dumps(rag["citations"])
 
 
 def _fallback_narrative(summary: dict, exc: Exception) -> str:

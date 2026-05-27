@@ -28,11 +28,62 @@ from ai.counterfactual import simulate_counterfactual
 from ai.granite import generate
 from ai.rag import build_race_context
 from db.connection import SessionLocal
-from db.models import Driver, LapTime, PitStop, Race, RaceResult
+from db.models import Driver, LapTime, PitStop, Race, RaceResult, Scenario
 
 
 MAX_CHANGES = 4
 MIN_GAIN_TO_CONTINUE = 1  # at least one position improved per step
+
+
+def _coach_rewrite(driver_code: str, raw_reasons: list[dict]) -> list[dict]:
+    """Rewrite the engineering-style rationale strings into coach-style
+    single sentences via Granite. Gracefully degrades to the raw string
+    when Granite is unavailable or returns nothing parseable.
+    """
+    if not raw_reasons:
+        return raw_reasons
+
+    bullet_lines = "\n".join(
+        f"{i + 1}. {r.get('rationale', '')}" for i, r in enumerate(raw_reasons)
+    )
+    prompt = f"""You are a Formula 1 race engineer coaching {driver_code}. Rewrite each rationale below into a single coaching sentence directed at the driver. Keep the same facts; do not invent new ones. Output exactly one rewritten line per input, prefixed with the same number.
+
+Rationales:
+{bullet_lines}
+
+Coaching:"""
+
+    try:
+        out = generate(prompt, max_new_tokens=260, temperature=0.45, timeout=15)
+    except Exception:
+        return raw_reasons
+
+    parsed: dict[int, str] = {}
+    for line in out.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped[0].isalpha():
+            continue
+        # accepts "1. ...", "1) ...", "1 - ..."
+        for sep in (".", ")", "-"):
+            if sep in stripped[:4]:
+                idx_part, _, rest = stripped.partition(sep)
+                try:
+                    idx = int(idx_part.strip())
+                except ValueError:
+                    continue
+                rest = rest.strip()
+                if rest:
+                    parsed[idx - 1] = rest[:240]
+                break
+
+    if not parsed:
+        return raw_reasons
+
+    rewritten: list[dict] = []
+    for i, item in enumerate(raw_reasons):
+        coached = parsed.get(i)
+        rewritten.append({**item, "rationale": coached or item.get("rationale", "")})
+    return rewritten
 
 
 def _driver_id_by_code(db: Session, code: str) -> Optional[int]:
@@ -245,6 +296,31 @@ Storyline:"""
         if cand.get("_reason"):
             reasons.append({"change": change, "rationale": cand["_reason"]})
 
+    # Coach-me rewrite: turn the engineering reasons into coaching sentences.
+    reasons = _coach_rewrite(driver_code, reasons)
+
+    # Persist as a Scenario so the user can re-open it from /scenarios.
+    # Best-effort: don't let a DB write break the response.
+    scenario_id: int | None = None
+    if applied:
+        try:
+            label = (
+                f"Glory: {driver_code} P{starting_pos or '?'} -> "
+                f"P{achieved or '?'} ({race.name} {race.season_year})"
+            )
+            with SessionLocal() as write_db:
+                scenario = Scenario(
+                    label=label[:120],
+                    race_id=race_id,
+                    changes=applied,
+                )
+                write_db.add(scenario)
+                write_db.commit()
+                write_db.refresh(scenario)
+                scenario_id = scenario.id
+        except Exception:
+            scenario_id = None
+
     return {
         "race_id": race_id,
         "driver_code": driver_code,
@@ -255,6 +331,7 @@ Storyline:"""
         "rationales": reasons,
         "explanation": story,
         "citations": rag["citations"],
+        "scenario_id": scenario_id,
     }
 
 
