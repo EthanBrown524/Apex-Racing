@@ -1,13 +1,77 @@
 # APEX Race Director
 
 **An AI-powered Formula 1 alternate-history simulator.**
-Built on the IBM watsonx + Granite stack for the IBM May 2026 hackathon.
+Built on the IBM watsonx + Granite stack for the **IBM May 2026 Innovation Challenge** ("Car Racing and AI").
 
 APEX turns every Grand Prix from **2019-2024** into an editable timeline.
 Replay any race with telemetry-driven cars and Granite-narrated commentary,
 rewrite the strategy in the What-If Lab, watch the **season championship flip
 in real time**, or ask **Glory Path** to find the smallest set of changes that
 gets your favourite driver to P1.
+
+> **Live data:** the deployed instance has 128 Grand Prix · 140,202 lap times · 3,487 pit stops · 148 safety-car windows · 22,977 telemetry paths · 5,260 RAG chunks indexed across race narratives, FIA stewards' decisions, and FIA technical regulations.
+
+---
+
+## The problem
+
+Formula 1 is the most data-intensive sport in the world, but the **questions
+fans care most about are counterfactual** — "what if Verstappen's engine had
+broken at Abu Dhabi 2021?" "what if Leclerc had pitted earlier at Monaco
+2022?" — and no existing tool answers them with rigor. Broadcast commentary
+moves on the second the race ends. Strategy blogs argue for paragraphs
+without evidence. Fantasy leagues only score what happened.
+
+**APEX makes counterfactual reasoning a first-class, evidence-grounded
+interaction**: replay a race, change a single decision, and watch the
+deterministic simulator + IBM Granite recompute the standings, the
+championship, and the storyline — every claim cited back to the underlying
+race data and the relevant FIA decisions.
+
+## AI / technical approach
+
+APEX is a React + FastAPI + PostgreSQL/pgvector application with **IBM
+watsonx.ai at the centre of every AI surface**:
+
+| AI surface | IBM technology | What it does |
+|---|---|---|
+| Counterfactual explanation | **Granite-3-8b-instruct** | 3-4 sentence narrative of how the strategy change altered the outcome, with `[n]` citations into the RAG context |
+| **Streaming** Q&A ("Ask APEX") | Granite (SSE via `/ml/v1/text/generation_stream`) | Token-by-token answers in the Time Machine, citations appended after the stream ends |
+| AI Race Director | Granite emits **structured JSON** | Plans per-driver strategic responses (`pit/stay_out/retire/push/manage`) to a trigger, expanded into deterministic engine changes |
+| Glory Path storylines + coach-me rewrites | Granite | Rewrites engineering rationales into single coaching sentences for the chosen driver |
+| Forecast | Granite (with heuristic fallback) | Re-ranks drivers' win probabilities and writes one-line strategy text per driver |
+| Realism Score | Granite + heuristic blend (70/30) | 0-1 plausibility chip — "Plausible / Borderline / Stretch / Fantasy" |
+| RAG retrieval | **Slate-30m-english-rtrvr** (1536-padded) | 5,260 chunks across race narratives, FIA decisions, FIA regulations |
+| FIA decision ingestion | **Docling** | Extracts FIA stewards' PDFs to structured markdown for indexing |
+| Visual pipeline graphs | **Langflow** | Exportable graphs of counterfactual / glory-path / forecast in `langflow/*.json` |
+
+A **deterministic Python simulator** handles the seven physical change types
+(`pit_lap`, `dnf`, `fastest_lap`, `mechanical`, `weather`, `safety_car`,
+`grid_swap`) — Granite explains, but never invents, the outcome. Every
+Granite call is **graceful-degrading**: if watsonx is unreachable the engine
+still runs and the UI never breaks.
+
+## Why this matters in the context of racing
+
+- **For fans:** APEX turns passive viewing into active inquiry. The
+  Championship Impact card lets a fan see, in real time, that a single
+  mechanical at Abu Dhabi 2021 would have given Hamilton an eighth title.
+  Every claim cites the underlying race data, so the fan isn't asked to
+  trust the model on vibes.
+- **For broadcasters & content creators:** the AI Race Director simulates
+  how a strategic trigger (rain at lap 25, safety car at lap 7) would have
+  rippled through every driver's pit window — the same analysis a strategy
+  desk does in the moment, automated and explainable.
+- **For trust:** F1 already uses opaque ML in race strategy. APEX is the
+  opposite: a deterministic core that's auditable line-by-line, wrapped in
+  an LLM layer that **must cite** the retrieved context. The Realism Score
+  publicly rates how plausible a counterfactual is — fantasy scenarios are
+  labelled as such.
+- **Generalisable beyond F1:** the (`replay → counterfactual → cited
+  explanation`) pattern applies to any structured sport — NASCAR, IndyCar,
+  Le Mans, motorcycle racing — and to any process with a deterministic
+  state machine and unstructured decision context (medicine, supply chain,
+  finance).
 
 ## Modes
 
@@ -49,8 +113,10 @@ React (Vite) <--> FastAPI <--> PostgreSQL + pgvector
 
 | Doc | Purpose |
 |-----|---------|
+| [`docs/SUBMISSION.md`](docs/SUBMISSION.md) | **Hackathon submission pack** - copy-paste prose blocks + 3-minute video script + pre-submission smoke test. |
 | [`docs/APEX_Technical_Document_v2.md`](docs/APEX_Technical_Document_v2.md) | Full technical spec (architecture, data model, IBM stack, API contract, performance notes, demo script, tests). |
 | [`docs/SETUP_AND_INGEST.md`](docs/SETUP_AND_INGEST.md) | Step-by-step setup + 2019-2024 ingestion runbook. |
+| [`docs/FIA_INGESTION.md`](docs/FIA_INGESTION.md) | How to drop FIA stewards' PDFs into the RAG index via Docling. |
 | [`docs/ROADMAP_FOR_CLAUDE.md`](docs/ROADMAP_FOR_CLAUDE.md) | Tasks for follow-on agents with files, instructions, and acceptance checks. |
 
 ## Setup (TL;DR)
